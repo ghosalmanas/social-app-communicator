@@ -1,0 +1,1456 @@
+package com.wtf.app.web.driver;
+
+import com.wtf.app.model.enums.TaskType;
+import com.wtf.app.util.SessionKeepAlive;
+import com.wtf.app.util.ThreadLocalAutomationContext;
+import io.github.bonigarcia.wdm.WebDriverManager;
+import jakarta.inject.Provider;
+import org.openqa.selenium.*;
+import org.openqa.selenium.chrome.ChromeDriver;
+import org.openqa.selenium.chrome.ChromeDriverService;
+import org.openqa.selenium.chrome.ChromeOptions;
+import org.openqa.selenium.remote.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Lazy;
+import org.springframework.scheduling.annotation.Scheduled;
+
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.time.Duration;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.logging.Level;
+import java.util.stream.Collectors;
+
+import com.wtf.app.util.RecycleBinUtil;
+import org.openqa.selenium.logging.LogType;
+import org.openqa.selenium.logging.LoggingPreferences;
+import org.apache.commons.io.FileUtils;
+import java.util.logging.Level;
+
+/**
+ * Manages multiple WebDriver instances for parallel execution with isolated profiles.
+ */
+@Configuration
+@Lazy
+public class ParallelWebDriverManager {
+    // Minimum free disk space required in bytes (1GB)
+    private static final long MIN_DISK_SPACE_BYTES = 1024 * 1024 * 1024;
+    private static final long MAX_CACHE_SIZE_BYTES = 100 * 1024 * 1024; // 100MB max cache per profile
+    private static final long MAX_PROFILES_TO_KEEP = 3; // Keep only the 3 most recent profiles
+    private static final long MAX_PROFILE_AGE_MINUTES = 30; // Delete profiles older than 30 minutes
+    // Maximum number of WebDriver instances to prevent resource exhaustion
+    private static final int MAX_CONCURRENT_DRIVERS = 5;
+    
+    // Time in milliseconds between disk space checks
+    private static final long DISK_SPACE_CHECK_INTERVAL_MS = 300000; // 5 minutes
+    private static final Logger logger = LoggerFactory.getLogger(ParallelWebDriverManager.class);
+    
+    @Value("${browser.profile.directory:C:/temp/chrome-profiles}")
+    private String profileBaseDir;
+    
+    @Value("${webdriver.headless:false}")
+    private boolean headless;
+    
+    @Value("${webdriver.timeout.pageLoad:300}")
+    private int pageLoadTimeout;
+    
+    @Value("${webdriver.timeout.implicit:50}")
+    private int implicitWait;
+    
+    @Autowired
+    private SessionKeepAlive sessionKeepAlive;
+    
+    @Autowired
+    private WebDriverHealthService webDriverHealthService;
+    
+    @Value("${webdriver.chrome.version:latest}")
+    private String chromeVersion;
+    
+    @Value("${webdriver.chrome.binary:}")
+    private String chromeBinaryPath;
+    
+    @Value("${webdriver.chrome.driver:}")
+    private String chromeDriverPath;
+    
+    @Value("${webdriver.chrome.args:}")
+    private String[] chromeArgs;
+    
+    @Value("${webdriver.chrome.experimental.options:{}}")
+    private String experimentalOptionsJson = "{}";
+    
+    private ChromeOptions experimentalOptions = new ChromeOptions();
+    
+    @Value("${webdriver.retry.attempts:3}")
+    private int maxRetryAttempts;
+    
+    @Value("${webdriver.retry.delay:1000}")
+    private long retryDelayMs;
+    
+    @Value("${webdriver.chrome.log.level:SEVERE}")
+    private String chromeLogLevel;
+    
+    private final ConcurrentMap<TaskType, WebDriver> profileDriverMap = new ConcurrentHashMap<>();
+    private final Map<String, WebDriver> driverMap = new ConcurrentHashMap<>();
+
+    private volatile long lastDiskSpaceCheck = 0;
+    private volatile long lastFreeSpace = 0;
+    private final ThreadLocal<String> currentProfile = new ThreadLocal<>();
+    private final ThreadLocal<WebDriver> currentDriverInThreadLocal = new ThreadLocal<>();
+    private final Map<String, String> profileToPathMap = new ConcurrentHashMap<>();
+    
+    private String createUniqueProfileDirectory(String profileName) {
+        String timestamp = String.valueOf(System.currentTimeMillis());
+        String uniqueProfileName = profileName + "_" + timestamp + "_" + Thread.currentThread().getId();
+        Path profilePath = Paths.get(profileBaseDir, uniqueProfileName);
+        
+        try {
+            Files.createDirectories(profilePath);
+            logger.info("Created unique profile directory: {}", profilePath);
+            return profilePath.toString();
+        } catch (IOException e) {
+            logger.error("Failed to create unique profile directory: {}", profilePath, e);
+            throw new RuntimeException("Failed to create unique profile directory", e);
+        }
+    }
+
+    
+    /**
+     * Ensures the base profile directory exists and has enough space.
+     * @throws IllegalStateException if disk space is insufficient
+     */
+    private void ensureProfileDirectory() {
+        try {
+            File profileDir = new File(profileBaseDir);
+            if (!profileDir.exists()) {
+                if (!profileDir.mkdirs()) {
+                    throw new IOException("Failed to create profile directory: " + profileBaseDir);
+                }
+                logger.info("Created profile directory: {}", profileBaseDir);
+            }
+
+            // Ensure WhatsApp profile directory exists
+            File whatsappProfileDir = new File(profileBaseDir, "whatsapp-profile");
+            if (!whatsappProfileDir.exists() && !whatsappProfileDir.mkdirs()) {
+                logger.warn("Failed to create WhatsApp profile directory: {}", whatsappProfileDir.getAbsolutePath());
+            }
+            cleanupOldProfiles();
+
+            // Check disk space
+            long freeSpace = getAvailableSpace(profileBaseDir);
+            if (freeSpace < MIN_DISK_SPACE_BYTES) {
+                logger.warn("Low disk space: {}MB available, {}MB required. Attempting to free up space...",
+                        freeSpace / (1024 * 1024), MIN_DISK_SPACE_BYTES / (1024 * 1024));
+
+                if (!tryFreeUpSpace()) {
+                    // One final cleanup attempt
+                    cleanupOldProfiles(true); // Force cleanup
+                    freeSpace = getAvailableSpace(profileBaseDir);
+
+                    if (freeSpace < MIN_DISK_SPACE_BYTES) {
+                        throw new IllegalStateException(String.format(
+                                "Insufficient disk space. Required: %dMB, Available: %dMB. " +
+                                        "Please free up disk space and try again.",
+                                MIN_DISK_SPACE_BYTES / (1024 * 1024),
+                                freeSpace / (1024 * 1024)
+                        ));
+                    }
+                }
+            }
+            logger.info("Disk space check passed. Available: {}MB", freeSpace / (1024 * 1024));
+        } catch (Exception e) {
+           logger.error("Failed to check disk space", e);
+        }
+        
+    }
+    
+    @PostConstruct
+    public void init() {
+        parseExperimentalOptions();
+        ensureProfileDirectory();
+        scheduleProfileCleanup();
+        
+        try {
+            
+            // Initialize WebDriverManager properties
+            System.setProperty("wdm.targetPath", "target/webdrivers");
+            System.setProperty("wdm.forceCache", "true");
+            System.setProperty("wdm.forceDownload", "false");
+            
+            // Configure ChromeDriver logging
+            Level logLevel = Level.parse(chromeLogLevel);
+            System.setProperty(ChromeDriverService.CHROME_DRIVER_SILENT_OUTPUT_PROPERTY, 
+                logLevel == Level.OFF ? "true" : "false");
+            
+            // Set Chrome binary path if specified
+            if (chromeBinaryPath != null && !chromeBinaryPath.trim().isEmpty()) {
+                System.setProperty("webdriver.chrome.binary", chromeBinaryPath);
+                logger.info("Using Chrome binary from: {}", chromeBinaryPath);
+            }
+            
+            // Set ChromeDriver path if specified
+            if (chromeDriverPath != null && !chromeDriverPath.trim().isEmpty()) {
+                System.setProperty("webdriver.chrome.driver", chromeDriverPath);
+                logger.info("Using ChromeDriver from: {}", chromeDriverPath);
+            } else {
+                // Setup WebDriverManager if no explicit path provided
+                setupWebDriverManager();
+            }
+            
+            logger.info("ParallelWebDriverManager initialized with profile directory: {}", profileBaseDir);
+            logger.debug("WebDriver configuration - headless: {}, pageLoadTimeout: {}s, implicitWait: {}s, maxRetries: {}", 
+                headless, pageLoadTimeout, implicitWait, maxRetryAttempts);
+                
+        } catch (Exception e) {
+            logger.error("Error initializing ParallelWebDriverManager: {}", e.getMessage(), e);
+            throw new RuntimeException("Failed to initialize WebDriver manager", e);
+        }
+    }
+    
+    private void parseExperimentalOptions() {
+        try {
+            /*if (experimentalOptionsJson != null && !experimentalOptionsJson.trim().isEmpty()) {
+                ObjectMapper mapper = new ObjectMapper();
+                experimentalOptions = mapper.readValue(experimentalOptionsJson, 
+                    new TypeReference<Map<String, Object>>() {});
+                logger.info("Loaded experimental options: {}", experimentalOptions);
+            } else */{
+                logger.info("No experimental options provided, using defaults");
+                experimentalOptions = getHumanLikeOptions();
+            }
+        } catch (Exception e) {
+            logger.warn("Failed to parse experimental options: {}", e.getMessage());
+            experimentalOptions = getHumanLikeOptions();
+        }
+    }
+
+
+
+    public ChromeOptions getHumanLikeOptions() {
+        ChromeOptions options = new ChromeOptions();
+
+        // Common arguments for a more "human" appearance
+        options.addArguments("--start-maximized");
+        options.addArguments("--window-size=1920,1080"); // Or other common resolutions
+        options.addArguments("--disable-blink-features=AutomationControlled");
+        options.addArguments("--disable-notifications");
+        //options.addArguments("--incognito");
+        options.addArguments("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"); // Example user agent
+        options.addArguments("--lang=en-US");
+
+        // Potentially helpful, but consider the implications
+        // options.addArguments("--disable-gpu");
+        // options.addArguments("--no-sandbox"); // Use with caution
+
+        // Experimental options
+        options.setExperimentalOption("excludeSwitches", java.util.Arrays.asList("enable-automation"));
+        options.setExperimentalOption("useAutomationExtension", false);
+
+        // To use a custom user profile (replace with your profile path)
+         //options.addArguments("user-data-dir=/path/to/your/custom/profile");
+
+        /*Own Features */
+        /*Path path = Paths.get("src/resources/extensions/webextensions-selenium-example.crx");//
+        File extensionFilePath = new File(path.toUri());
+        options.addExtensions(extensionFilePath);*/
+
+
+		DesiredCapabilities capabilities = new DesiredCapabilities();
+		capabilities.setCapability(CapabilityType.UNHANDLED_PROMPT_BEHAVIOUR, UnexpectedAlertBehaviour.IGNORE);
+		capabilities.setCapability(ChromeOptions.CAPABILITY, options);
+
+		options.merge(capabilities);
+
+        return options;
+    }
+
+    @Qualifier("chromeDriver")
+    public Provider<WebDriver> chromeDriverProvider() {
+        return this::getCurrentDriver;
+    }
+
+
+
+    private void setupWebDriverManager() {
+        try {
+            WebDriverManager wdm = WebDriverManager.chromedriver();
+            
+            // Set ChromeDriver version if specified
+            if (chromeVersion != null && !chromeVersion.isEmpty() && !"latest".equalsIgnoreCase(chromeVersion)) {
+                wdm.driverVersion(chromeVersion);
+                logger.info("Using ChromeDriver version: {}", chromeVersion);
+            } else {
+                wdm.setup();
+                logger.info("Using latest ChromeDriver version");
+            }
+            
+            // Get the resolved ChromeDriver path
+            String driverPath = wdm.getDownloadedDriverPath();
+            if (driverPath != null) {
+                logger.debug("ChromeDriver resolved to: {}", driverPath);
+            }
+            
+            // Clean up old profiles in the background
+            new Thread(this::cleanupOldProfiles).start();
+            
+        } catch (Exception e) {
+            logger.error("Error setting up WebDriverManager: {}", e.getMessage(), e);
+            throw new RuntimeException("Failed to setup WebDriverManager", e);
+        }
+    }
+    
+    /**
+     * Get a WebDriver instance for the specified profile.
+     * Creates a new instance if one doesn't exist for the profile.
+     */
+    /**
+     * Gets or creates a WebDriver instance for the specified task type with retry logic.
+     * If an existing driver exists and is active, it will be returned. Otherwise, a new one will be created.
+     * 
+     * @param taskType The type of task to get a WebDriver for
+     * @return A valid WebDriver instance
+     * @throws RuntimeException if a valid WebDriver cannot be created after all retry attempts
+     */
+    public synchronized WebDriver getDriver(TaskType taskType) {
+        logger.info("Getting WebDriver for task type: {}", taskType);
+        
+        // Check if we have an existing driver that's still active
+        WebDriver driver = profileDriverMap.get(taskType);
+        if (driver != null) {
+            try {
+                if (isSessionActive(driver)) {
+                    logger.debug("Returning existing active WebDriver for task: {}", taskType);
+                    return driver;
+                } else {
+                    logger.info("Existing WebDriver for task {} is no longer active, creating a new one", taskType);
+                    safeQuitDriver(driver);
+                }
+            } catch (Exception e) {
+                logger.warn("Error checking existing WebDriver for task {}: {}", taskType, e.getMessage());
+                safeQuitDriver(driver);
+            }
+        }
+        
+        // Create new driver with retry logic
+        return createDriverWithRetry(taskType);
+    }
+    
+    /**
+     * Creates a new WebDriver instance with retry logic and automatic recovery.
+     * Implements exponential backoff between retry attempts.
+     */
+    private WebDriver createDriverWithRetry(TaskType taskType) {
+        int attempts = 0;
+        Exception lastError = null;
+        WebDriver driver = null;
+        
+        while (attempts < maxRetryAttempts) {
+            attempts++;
+            try {
+                logger.info("Attempt {}/{} to create WebDriver for task: {}", 
+                          attempts, maxRetryAttempts, taskType);
+                
+                // Clean up any existing driver for this task type
+                if (driver != null) {
+                    safeQuitDriver(driver);
+                    driver = null;
+                }
+                
+                // Create new driver
+                driver = createWebDriver(taskType.name());
+                
+                // Verify the driver is working
+                if (isSessionActive(driver)) {
+                    profileDriverMap.put(taskType, driver);
+                    currentDriverInThreadLocal.set(driver);
+                    if (ThreadLocalAutomationContext.getContext() != null) {
+                        ThreadLocalAutomationContext.getContext().setDriver(driver);
+                    }
+                    logger.info("Successfully created and validated WebDriver for task: {}", taskType);
+                    return driver;
+                }
+                
+                logger.warn("New WebDriver session is not active, retrying...");
+                
+            } catch (Exception e) {
+                lastError = e;
+                logger.error("Error creating WebDriver (attempt {}/{}): {}", 
+                            attempts, maxRetryAttempts, e.getMessage());
+                
+                // If it's a connection error, try to clean up Chrome processes
+                if (isConnectionError(e) || (e.getCause() != null && e.getCause() instanceof WebDriverException 
+                        && isConnectionError((WebDriverException) e.getCause()))) {
+                    cleanupChromeProcesses();
+                }
+                
+                // Exponential backoff
+                if (attempts < maxRetryAttempts) {
+                    long delay = (long) (retryDelayMs * Math.pow(2, attempts - 1));
+                    logger.info("Waiting {}ms before retry...", delay);
+                    try {
+                        Thread.sleep(delay);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        throw new RuntimeException("Thread interrupted while waiting to retry", ie);
+                    }
+                }
+            }
+        }
+        
+        // If we get here, all retries failed
+        String errorMsg = String.format("Failed to create WebDriver after %d attempts for task: %s", 
+                                      maxRetryAttempts, taskType);
+        logger.error(errorMsg);
+        throw new RuntimeException(errorMsg, lastError);
+    }
+    
+    /**
+     * Helper method to detect if an exception is related to WebSocket/connection issues.
+     */
+    private boolean isConnectionError(WebDriverException e) {
+        if (e == null) return false;
+        
+        String errorMessage = e.getMessage();
+        if (errorMessage == null) return false;
+        
+        // Common connection-related error messages
+        return errorMessage.contains("Connection reset") ||
+               errorMessage.contains("chrome not reachable") ||
+               errorMessage.contains("session deleted because of page crash") ||
+               errorMessage.contains("disconnected: unable to connect to renderer") ||
+               errorMessage.contains("no such session") ||
+               errorMessage.contains("target window already closed") ||
+               errorMessage.contains("chrome not reachable");
+    }
+    
+    /**
+     * Cleans up any running Chrome and ChromeDriver processes.
+     * This is a last resort when normal WebDriver cleanup fails.
+     */
+    private void cleanupChromeProcesses() {
+        logger.info("Cleaning up Chrome processes...");
+        try {
+            if (System.getProperty("os.name").toLowerCase().contains("win")) {
+                // Windows
+                Runtime.getRuntime().exec("taskkill /F /IM chrome.exe");
+                Runtime.getRuntime().exec("taskkill /F /IM chromedriver.exe");
+                Runtime.getRuntime().exec("taskkill /F /IM chrome_proxy.exe");
+            } else {
+                // Unix/Linux/Mac
+                Runtime.getRuntime().exec("pkill -f chrome");
+                Runtime.getRuntime().exec("pkill -f chromedriver");
+            }
+            // Give some time for processes to terminate
+            Thread.sleep(2000);
+        } catch (Exception e) {
+            logger.warn("Error during Chrome process cleanup: {}", e.getMessage());
+        }
+    }
+    
+    private String createUniqueProfileDirectory(String profileName) {
+            WebDriver driver = profileDriverMap.get(taskType);
+            
+            // If driver doesn't exist or session is not active, create a new one
+            if (driver == null || !webDriverHealthService.checkSessionHealth(taskType)) {
+                int maxRetries = 1;
+                int retryCount = 0;
+                long retryDelayMs = 1000; // Start with 1 second delay
+                
+                while (retryCount < maxRetries) {
+                    try {
+                        logger.info("Creating WebDriver for profile: {}", profileName);
+                        logger.info("Driver Map: {}", profileDriverMap.entrySet().stream().map(e->e.getKey()+"-"+e.getValue().getCurrentUrl()+"-"+e.getValue().getTitle()).collect(Collectors.joining(",")));
+
+                        driver = createWebDriver(profileName);
+                        if (isSessionActive(driver)) {// REVERT if required
+                            profileDriverMap.put(taskType, driver);
+                            logger.info("WebDriver created for profile: {} {}", profileName, driver.getCurrentUrl());
+                            currentDriverInThreadLocal.set(driver);
+                            ThreadLocalAutomationContext.getContext().setDriver(driver);
+                            return driver;
+                        }
+                    } catch (Exception e) {
+                        logger.warn("WebDriver creation attempt {} failed: {}", retryCount + 1, e.getMessage());
+                    }
+                    
+                    retryCount++;
+                    if (retryCount < maxRetries) {
+                        try {
+                            Thread.sleep(retryDelayMs);
+                            retryDelayMs *= 2; // Exponential backoff
+                        } catch (InterruptedException ie) {
+                            Thread.currentThread().interrupt();
+                            throw new IllegalStateException("Thread interrupted while waiting to retry WebDriver creation", ie);
+                        }
+                    }
+                }
+                
+                throw new IllegalStateException("Failed to create a valid WebDriver after " + maxRetries + " attempts");
+            }
+            return driver;
+        } catch (Exception e) {
+            logger.error("Error getting WebDriver for profile: " + taskType.name(), e);
+            throw e;
+        }
+    }
+    
+    /**
+     * Get the WebDriver for the current thread's active profile.
+     */
+    public WebDriver getCurrentDriver() {
+
+        /*String taskType = currentProfile.get();
+        if (taskType == null) {*/
+
+        logger.info("Getting WebDriver for current thread {} {}", Thread.currentThread().getName(), ThreadLocalAutomationContext.getContext().getTaskType());
+
+        if(currentDriverInThreadLocal.get()!=null){
+            logger.info("Getting WebDriver from current thread {} {}", currentDriverInThreadLocal.get().getCurrentUrl(), ThreadLocalAutomationContext.getContext().getTaskType().name());
+            profileDriverMap.put(ThreadLocalAutomationContext.getContext().getTaskType(), ThreadLocalAutomationContext.getContext().getDriver());
+            return currentDriverInThreadLocal.get();
+        }
+                return driver;
+            } else {
+                logger.info("Existing WebDriver for task {} is no longer active, creating a new one", taskType);
+                safeQuitDriver(driver);
+            }
+
+        logger.info("Setting WebDriver for current thread {} {}", webDriver.getCurrentUrl(), ThreadLocalAutomationContext.getContext().getDriver().getCurrentUrl());
+        currentDriverInThreadLocal.set(webDriver);
+        ThreadLocalAutomationContext.getContext().setDriver(webDriver);
+        logger.info("Verifying and returning WebDriver for current thread {} {}", webDriver.getCurrentUrl(), ThreadLocalAutomationContext.getContext().getDriver().getCurrentUrl());
+
+        try {
+            // Check if the driver is still valid
+            webDriver.getCurrentUrl(); // This will throw if driver is invalid
+            return webDriver;
+        } catch (Exception e) {
+            logger.warn("Existing WebDriver session is invalid, creating new one", e);
+            profileDriverMap.remove(taskType);
+            return getDriver(taskType);
+        }
+    }
+    
+    /**
+     * Create a new WebDriver instance with the specified profile.
+     * Implements retry logic and session validation.
+     */
+    /**
+     * Creates a new WebDriver instance with the specified profile.
+     * Implements retry logic, session validation, and resource management.
+     */
+    private WebDriver createWebDriver(String profileName) {
+        // Check resource constraints before proceeding
+        if (profileDriverMap.size() >= MAX_CONCURRENT_DRIVERS) {
+            throw new IllegalStateException(
+                String.format("Maximum number of concurrent WebDrivers (%d) reached", MAX_CONCURRENT_DRIVERS));
+        }
+        
+        ensureProfileDirectory();  // Check disk space and clean up if needed
+        
+        ChromeOptions options = new ChromeOptions();
+        WebDriver driver = null;
+        int attempt = 0;
+        Exception lastError = null;
+        long currentRetryDelay = retryDelayMs;
+
+        while (attempt < maxRetryAttempts) {
+            attempt++;
+            logger.info("Attempt {}/{} to create WebDriver for profile: {}", attempt, maxRetryAttempts, profileName);
+            
+            try {
+                // Create a unique profile directory for this session
+                String profilePath = createUniqueProfileDirectory(profileName);
+                options.addArguments("--user-data-dir=" + profilePath);
+                
+                // Configure Chrome options with security and performance optimizations
+                if (headless) {
+                    options.addArguments("--headless=new");
+                }
+                
+                // Create cache and storage directories
+                String cacheDir = profilePath + File.separator + "cache";
+                new File(cacheDir).mkdirs();
+                
+                options.addArguments(
+                    "--disable-gpu",
+                    "--no-sandbox",
+                    "--disable-dev-shm-usage",
+                    "--remote-allow-origins=*",
+                    "--disable-extensions",
+                    "--disable-software-rasterizer",
+                    "--disable-notifications",
+                    "--disable-popup-blocking",
+                    "--disable-infobars",
+                    "--ignore-certificate-errors",
+                    "--disable-web-resource",
+                    "--disable-translate",
+                    "--safebrowsing-disable-download-protection",
+                    "--safebrowsing-disable-extension-blacklist",
+                    "--start-maximized",
+                    "--disable-application-cache",
+                    "--media-cache-size=1",
+                    "--disk-cache-size=104857600",  // 100MB cache limit
+                    "--disk-cache-dir=" + cacheDir,
+                    "--disable-background-networking",
+                    "--disable-client-side-phishing-detection",
+                    "--disable-component-update",
+                    "--disable-default-apps",
+                    "--disable-hang-monitor",
+                    "--disable-prompt-on-repost",
+                    "--disable-sync",
+                    "--metrics-recording-only",
+                    "--no-first-run",
+                    "--safebrowsing-disable-auto-update",
+                    "--password-store=basic",
+                    "--use-mock-keychain"
+                );
+                
+                // Disable various background services that consume disk space
+                Map<String, Object> prefs = new HashMap<>();
+                prefs.put("profile.default_content_setting_values.notifications", 2);
+                prefs.put("credentials_enable_service", false);
+                prefs.put("profile.password_manager_enabled", false);
+                prefs.put("profile.default_content_settings.popups", 0);
+                prefs.put("download_restrictions", 3);
+                prefs.put("safebrowsing.enabled", false);
+                prefs.put("safebrowsing.malware.enabled", false);
+                prefs.put("safebrowsing.disable_proxy", true);
+                options.setExperimentalOption("prefs", prefs);
+
+                options.addArguments("--lang=en-US");
+
+                if (headless) {
+                    options.addArguments("--headless=new");
+                }
+                
+                // Add any additional Chrome arguments from configuration
+                if (chromeArgs != null && chromeArgs.length > 0) {
+                    options.addArguments(chromeArgs);
+                }
+                
+                // Set experimental options
+                /*if (!experimentalOptions.isEmpty()) {
+                    experimentalOptions.forEach(options::setExperimentalOption);
+                }*/
+
+                // Set page load strategy
+                options.setPageLoadStrategy(PageLoadStrategy.NORMAL);
+
+                // Disable automation flags
+                options.setExperimentalOption("excludeSwitches",
+                    Arrays.asList("enable-automation", "load-extension"));
+                options.setExperimentalOption("useAutomationExtension", false);
+
+                // Set logging preferences
+                LoggingPreferences logPrefs = new LoggingPreferences();
+                logPrefs.enable(LogType.BROWSER, Level.SEVERE);
+                logPrefs.enable(LogType.DRIVER, Level.WARNING);
+                options.setCapability("goog:loggingPrefs", logPrefs);
+
+                // Create ChromeDriverService with logging
+                ChromeDriverService service = new ChromeDriverService.Builder()
+                    .withLogOutput(System.out)
+                    .withSilent(false)
+                    .build();
+
+                // Create the WebDriver instance with enhanced error handling
+                logger.info("Creating ChromeDriver instance for profile: {}", profileName);
+                driver = new ChromeDriver(service, options);
+
+                // Configure timeouts
+                configureDriverTimeouts(driver);
+
+                // Validate the session
+                if (isSessionActive(driver)) {
+                    logger.info("Successfully created and validated WebDriver for profile: {}", profileName);
+                    return driver;
+                } else {
+                    logger.warn("WebDriver session validation failed for profile: {}", profileName);
+                    safeQuitDriver(driver);
+                    driver = null;
+                }
+                
+            } catch (Exception e) {
+                logger.error("Error creating WebDriver for profile {}: {}", profileName, e.getMessage(), e);
+                safeQuitDriver(driver);
+                driver = null;
+                lastError = e;
+                
+                // Wait before retrying if this wasn't the last attempt
+                if (attempt < maxRetryAttempts) {
+                    try {
+                        logger.info("Waiting {}ms before retry...", currentRetryDelay);
+                        Thread.sleep(currentRetryDelay);
+                        // Exponential backoff for next retry
+                        currentRetryDelay *= 2;
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        throw new RuntimeException("Thread interrupted while waiting to retry WebDriver creation", ie);
+                    }
+                }
+            }
+        }
+        
+        // If we get here, all attempts failed
+        String errorMsg = String.format("Failed to create WebDriver after %d attempts for profile: %s. Last error: %s", 
+            maxRetryAttempts, profileName, lastError != null ? lastError.getMessage() : "Unknown error");
+            
+        // Log detailed error information
+        logger.error(errorMsg);
+        logger.error("Profile directory: {}", profileToPathMap.get(profileName));
+        logger.error("Chrome version: {}", getChromeVersion());
+        logger.error("ChromeDriver version: {}", getChromeDriverVersion());
+        
+        // Provide troubleshooting suggestions
+        logger.error("\nTroubleshooting steps:" +
+                   "\n1. Make sure Chrome is installed and up to date" +
+                   "\n2. Verify ChromeDriver version matches your Chrome browser version" +
+                   "\n3. Check if Chrome is already running (try closing all Chrome instances)" +
+                   "\n4. Try running with a clean profile directory" +
+                   "\n5. Check for system resource constraints (CPU, memory, disk space)" +
+                   "\n6. Verify Chrome has necessary permissions to run");
+        
+        throw new RuntimeException(errorMsg, lastError);
+    }
+    
+    private String getChromeVersion() {
+        try {
+            Process process = new ProcessBuilder(
+                System.getProperty("webdriver.chrome.binary", "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"),
+                "--version"
+            ).start();
+            
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+                return reader.lines().findFirst().orElse("Unknown");
+            }
+        } catch (Exception e) {
+            logger.warn("Failed to get Chrome version: {}", e.getMessage());
+            return "Unknown";
+        }
+    }
+    
+    private String getChromeDriverVersion() {
+        try {
+            String driverPath = System.getProperty("webdriver.chrome.driver");
+            if (driverPath == null || driverPath.isEmpty()) {
+                return "Not specified (using WebDriverManager)";
+            }
+            
+            Process process = new ProcessBuilder(driverPath, "--version").start();
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
+                return reader.lines()
+                    .filter(line -> line.startsWith("ChromeDriver"))
+                    .findFirst()
+                    .orElse("Unknown");
+            }
+        } catch (Exception e) {
+            logger.warn("Failed to get ChromeDriver version: {}", e.getMessage());
+            return "Unknown";
+        }
+    }
+    
+    private void configureWebDriverManager() {
+        try {
+            logger.info("Configuring WebDriverManager for Chrome");
+            
+            // Setup WebDriverManager for Chrome
+            WebDriverManager chromeDriverManager = WebDriverManager.chromedriver();
+            
+            // Set ChromeDriver version based on configuration or auto-detect
+            if (chromeVersion != null && !chromeVersion.isEmpty() && !"latest".equalsIgnoreCase(chromeVersion)) {
+                logger.info("Using specified ChromeDriver version: {}", chromeVersion);
+                chromeDriverManager.driverVersion(chromeVersion);
+            } else {
+                logger.info("Using latest ChromeDriver version");
+            }
+            
+            // Configure WebDriverManager settings
+            chromeDriverManager.setup();
+            
+            // Log the resolved ChromeDriver version
+            String resolvedVersion = chromeDriverManager.getDownloadedDriverVersion();
+            logger.info("Resolved ChromeDriver version: {}", resolvedVersion);
+            
+            // Set system properties for ChromeDriver
+            System.setProperty("webdriver.chrome.silentOutput", "true");
+            
+            // Additional ChromeDriver options for better stability
+            System.setProperty("webdriver.chrome.verboseLogging", "false");
+            System.setProperty("webdriver.chrome.silentOutput", "true");
+            
+            // Disable ChromeDriver logging to console
+            java.util.logging.Logger.getLogger("org.openqa.selenium").setLevel(Level.SEVERE);
+            
+            logger.info("WebDriverManager configuration completed successfully");
+        } catch (Exception e) {
+            logger.error("Error configuring WebDriverManager", e);
+            throw new RuntimeException("Failed to configure WebDriverManager", e);
+        }
+    }
+    
+    /**
+     * Configures Chrome options with common settings for automation.
+     */
+    private ChromeOptions configureChromeOptions(String profileName) {
+        ChromeOptions options = new ChromeOptions();
+        
+        // Set user data directory for profile persistence
+        String profileDir = createUniqueProfileDirectory(profileName);
+        options.addArguments("--user-data-dir=" + profileDir);
+        
+        // Set page load strategy
+        options.setPageLoadStrategy(PageLoadStrategy.NORMAL);
+        
+        // Disable automation flags and extensions
+        options.setExperimentalOption("excludeSwitches", 
+            Arrays.asList("enable-automation", "load-extension"));
+        options.setExperimentalOption("useAutomationExtension", false);
+        
+        // Set logging preferences
+        LoggingPreferences logPrefs = new LoggingPreferences();
+        logPrefs.enable(LogType.BROWSER, Level.SEVERE);
+        logPrefs.enable(LogType.DRIVER, Level.WARNING);
+        options.setCapability("goog:loggingPrefs", logPrefs);
+        
+        // Add common arguments
+        options.addArguments(
+            "--start-maximized",
+            "--window-size=1920,1080",
+            "--disable-blink-features=AutomationControlled",
+            "--disable-notifications",
+            "--no-sandbox",
+            "--disable-dev-shm-usage"
+        );
+        
+        return options;
+    }
+    
+    /**
+     * Creates and configures ChromeDriverService with proper logging.
+     */
+    private ChromeDriverService createChromeDriverService() {
+        try {
+            return new ChromeDriverService.Builder()
+                .withLogOutput(System.out)
+                .withSilent(false)
+                .withLogFile(createLogFile("chromedriver"))
+                .build();
+        } catch (IOException e) {
+            logger.warn("Failed to create ChromeDriverService with log file, falling back to default", e);
+            return new ChromeDriverService.Builder().build();
+        }
+    }
+    
+    /**
+     * Creates a log file with timestamp for better debugging.
+     */
+    private File createLogFile(String prefix) throws IOException {
+        String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
+        String logFileName = String.format("%s_%s.log", prefix, timestamp);
+        File logFile = new File("logs", logFileName);
+        Files.createDirectories(logFile.getParentFile().toPath());
+        return logFile;
+    }
+    
+    private void configureDriverTimeouts(WebDriver driver) {
+        try {
+            driver.manage().timeouts().pageLoadTimeout(Duration.ofSeconds(pageLoadTimeout));
+            driver.manage().timeouts().implicitlyWait(Duration.ofSeconds(implicitWait));
+            logger.debug("Configured timeouts - PageLoad: {}s, Implicit: {}s", 
+                pageLoadTimeout, implicitWait);
+        } catch (Exception e) {
+            logger.error("Failed to configure driver timeouts: {}", e.getMessage(), e);
+            throw e;
+        }
+    // ... (rest of the code remains the same)
+
+    /**
+     * Clean up all WebDriver instances.
+     */
+    /**
+     * Checks if there's enough disk space available.
+     * @return true if there's enough space, false otherwise
+     */
+    /**
+     * Gets the available disk space for a given path
+     * @param path The path to check disk space for
+     * @return Available space in bytes
+     */
+    private long getAvailableSpace(String path) {
+        try {
+            File disk = new File(path);
+            return disk.getUsableSpace();
+        } catch (Exception e) {
+            logger.error("Error checking disk space for path: " + path, e);
+            return -1;
+        }
+    }
+    
+    /**
+     * Checks if there's enough disk space available on both C: drive and profile directory
+     * @return true if there's enough space, false otherwise
+     */
+    /**
+     * Attempts to free up disk space by cleaning the Recycle Bin and old profiles
+     * @return true if space was successfully freed, false otherwise
+     */
+    private boolean tryFreeUpSpace() {
+        logger.info("Attempting to free up disk space...");
+        
+        // 1. First try to clean up old profiles
+        int cleanedProfiles = cleanupOldProfiles();
+        logger.info("Cleaned up {} old profiles", cleanedProfiles);
+        
+        // 2. Clean up browser caches
+        int cleanedCache = cleanUpCache(new File(profileBaseDir));
+        logger.info("Cleaned up {} cache items", cleanedCache);
+        
+        // 3. Clean up temp files
+        try {
+            File tempDir = new File(System.getProperty("java.io.tmpdir"));
+            int tempFiles = cleanUpDirectory(tempDir, 7); // Clean files older than 7 days
+            logger.info("Cleaned up {} temporary files", tempFiles);
+        } catch (Exception e) {
+            logger.warn("Error cleaning temp files: {}", e.getMessage());
+        }
+        
+        // 4. Final check
+        long availableSpace = getAvailableSpace(profileBaseDir);
+        boolean hasEnoughSpace = availableSpace >= MIN_DISK_SPACE_BYTES;
+        
+        if (hasEnoughSpace) {
+            logger.info("Successfully freed up disk space. Now available: {}MB", 
+                availableSpace / (1024 * 1024));
+        } else {
+            logger.warn("Could not free up enough disk space. Available: {}MB, Required: {}MB",
+                availableSpace / (1024 * 1024), MIN_DISK_SPACE_BYTES / (1024 * 1024));
+        }
+        
+        return hasEnoughSpace;
+    }
+    
+    private synchronized boolean hasEnoughDiskSpace() {
+        long now = System.currentTimeMillis();
+        // Only check disk space once per interval to avoid performance issues
+        if (now - lastDiskSpaceCheck < DISK_SPACE_CHECK_INTERVAL_MS && lastFreeSpace > 0) {
+            return lastFreeSpace >= MIN_DISK_SPACE_BYTES;
+        }
+        
+        lastDiskSpaceCheck = now;
+        
+        // Check C: drive space
+        long cDriveSpace = getAvailableSpace("C:\\");
+        if (cDriveSpace < MIN_DISK_SPACE_BYTES) {
+            logger.warn("Low disk space on C: drive: {}MB available (minimum required: {}MB)", 
+                cDriveSpace / (1024 * 1024), MIN_DISK_SPACE_BYTES / (1024 * 1024));
+            
+            // Try to free up space automatically
+            if (tryFreeUpSpace()) {
+                // Check again after cleanup
+                cDriveSpace = getAvailableSpace("C:\\");
+                if (cDriveSpace >= MIN_DISK_SPACE_BYTES) {
+                    logger.info("Successfully freed up enough space on C: drive");
+                    lastFreeSpace = cDriveSpace;
+                    return true;
+                }
+            }
+            return false;
+        }
+        
+        // Check profile directory space (in case it's on a different drive)
+        lastFreeSpace = getAvailableSpace(profileBaseDir);
+        if (lastFreeSpace < MIN_DISK_SPACE_BYTES) {
+            logger.warn("Low disk space in profile directory ({}): {}MB available (minimum required: {}MB)", 
+                profileBaseDir, lastFreeSpace / (1024 * 1024), MIN_DISK_SPACE_BYTES / (1024 * 1024));
+            
+            // Try to free up space automatically
+            if (tryFreeUpSpace()) {
+                // Check again after cleanup
+                lastFreeSpace = getAvailableSpace(profileBaseDir);
+                if (lastFreeSpace >= MIN_DISK_SPACE_BYTES) {
+                    logger.info("Successfully freed up enough space in profile directory");
+                    return true;
+                }
+            }
+            return false;
+        }
+        
+        return true;
+    }
+    
+    /**
+     * Cleans up old profiles and cache to free up disk space.
+     * @return number of items cleaned up
+     */
+    /**
+     * Cleans up cache directories and files to free up disk space.
+     * @param directory The directory to clean up cache from
+     * @return number of cache items cleaned up
+     */
+    private int cleanUpCache(File directory) {
+        return cleanUpDirectory(directory, 0); // Clean all cache files regardless of age
+    }
+    
+    private int cleanUpDirectory(File directory, int maxAgeDays) {
+        if (!directory.exists() || !directory.isDirectory()) {
+            return 0;
+        }
+        
+        int cleanedCount = 0;
+        long cutoffTime = System.currentTimeMillis() - (maxAgeDays * 24 * 60 * 60 * 1000L);
+        File[] files = directory.listFiles();
+        
+        if (files == null) {
+            return 0;
+        }
+        
+        for (File file : files) {
+            try {
+                // Skip files that are too new or in use
+                if (maxAgeDays > 0 && file.lastModified() > cutoffTime) {
+                    continue;
+                }
+                
+                if (file.isDirectory()) {
+                    // Recursively clean subdirectories
+                    cleanedCount += cleanUpDirectory(file, maxAgeDays);
+                    
+                    // Delete the directory if it's empty
+                    String[] children = file.list();
+                    if (children != null && children.length == 0) {
+                        if (file.delete()) {
+                            cleanedCount++;
+                        }
+                    }
+                } else {
+                    // Delete cache and temporary files
+                    String name = file.getName().toLowerCase();
+                    if (name.contains("cache") || 
+                        name.endsWith(".tmp") || 
+                        name.endsWith(".temp") ||
+                        name.endsWith(".log") ||
+                        name.endsWith(".old") ||
+                        name.endsWith(".bak") ||
+                        name.startsWith("temp") ||
+                        name.startsWith("tmp")) {
+                        
+                        if (file.delete()) {
+                            cleanedCount++;
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                logger.warn("Error cleaning file {}: {}", file.getAbsolutePath(), e.getMessage());
+            }
+        }
+        
+        return cleanedCount;
+    }
+    
+    /**
+     * Cleans up old profiles and cache to free up disk space.
+     * @return number of items cleaned up
+     */
+    private int cleanupOldProfiles() {
+        return cleanupOldProfiles(false);
+    }
+    
+    private int cleanupOldProfiles(boolean forceCleanup) {
+        File profileDir = new File(profileBaseDir);
+        if (!profileDir.exists() || !profileDir.isDirectory()) {
+            return 0;
+        }
+
+        File[] profileDirs = profileDir.listFiles(File::isDirectory);
+        if (profileDirs == null || profileDirs.length == 0) {
+            return 0;
+        }
+
+        // Sort by last modified time, oldest first
+        Arrays.sort(profileDirs, Comparator.comparingLong(File::lastModified));
+
+        int deletedCount = 0;
+        long currentTime = System.currentTimeMillis();
+        long maxAgeMs = MAX_PROFILE_AGE_MINUTES * 60 * 1000L;
+        int activeProfiles = profileDriverMap.size();
+
+        for (File profile : profileDirs) {
+            try {
+                // Skip if this is the current profile being used
+                if (isProfileInUse(profile.getName())) {
+                    continue;
+                }
+
+                boolean isOld = (currentTime - profile.lastModified()) > maxAgeMs;
+                boolean isOverLimit = (profileDirs.length - deletedCount) > MAX_PROFILES_TO_KEEP;
+
+                if (forceCleanup || isOld || isOverLimit) {
+                    logger.info("Attempting to delete profile: {}", profile.getAbsolutePath());
+                    if (deleteDirectory(profile)) {
+                        deletedCount++;
+                        logger.info("Successfully deleted old profile: {}", profile.getName());
+                    } else {
+                        logger.warn("Failed to delete profile directory: {}", profile.getAbsolutePath());
+                    }
+                }
+            } catch (Exception e) {
+                logger.error("Error processing profile for cleanup: {}", profile.getAbsolutePath(), e);
+            }
+        }
+
+        if (deletedCount > 0) {
+            logger.info("Cleaned up {} old profile directories", deletedCount);
+        }
+
+        return deletedCount;
+    }
+
+    private boolean deleteDirectory(File directoryToBeDeleted) {
+        File[] allContents = directoryToBeDeleted.listFiles();
+        if (allContents != null) {
+            for (File file : allContents) {
+                deleteDirectory(file);
+            }
+        }
+        return directoryToBeDeleted.delete();
+    }
+
+    /**
+     * Checks if a profile is currently in use by any active WebDriver.
+     */
+    private boolean isProfileInUse(String profileName) {
+        return profileDriverMap.keySet().stream()
+            .anyMatch(key -> key.name().startsWith(profileName));
+    }
+    
+    @Scheduled(fixedRate = 30 * 60 * 1000) // Run every 30 minutes
+    public void scheduleProfileCleanup() {
+        try {
+            logger.info("Running scheduled profile cleanup");
+            cleanupOldProfiles();
+        } catch (Exception e) {
+            logger.error("Error during scheduled profile cleanup", e);
+        }
+    }
+
+    @PreDestroy
+    public void cleanup() {
+        logger.info("Shutting down ParallelWebDriverManager");
+        // Cleanup all drivers and profiles
+        profileDriverMap.forEach((profile, driver) -> closeDriverSafely(profile, driver));
+        profileDriverMap.clear();
+        currentDriverInThreadLocal.remove();
+        
+        // Cleanup session keep-alive if available
+        if (sessionKeepAlive != null) {
+            sessionKeepAlive.cleanup();
+        }
+
+        // Clean up all drivers, removing duplicates
+        Set<WebDriver> uniqueDrivers = new HashSet<>(driverMap.values());
+        driverMap.clear();
+
+        uniqueDrivers.forEach(driver -> {
+            try {
+                if (driver != null) {
+                    driver.quit();
+                }
+            } catch (Exception e) {
+                logger.error("Error cleaning up WebDriver", e);
+            }
+        });
+        logger.info("WebDriver cleanup completed");
+    }
+    
+    /**
+     * Safely closes a WebDriver instance and removes it from the profile map.
+     */
+    /**
+     * Safely closes a WebDriver instance and removes it from the profile map.
+    // * @param profileName The name of the profile to close
+     * @param driver The WebDriver instance to close
+     */
+    private void closeDriverSafely(TaskType taskType, WebDriver driver) {
+        String profileName = taskType.name();
+        if (driver != null) {
+            try {
+                logger.info("Closing WebDriver for profile: {}", profileName);
+                driver.quit();
+            } catch (Exception e) {
+                logger.error("Error closing WebDriver for profile: " + profileName, e);
+            } finally {
+                profileDriverMap.remove(taskType);
+                
+                // Clean up the profile directory if it exists
+                try {
+                    File profileDir = new File(profileBaseDir, profileName);
+                    if (profileDir.exists()) {
+                        FileUtils.deleteDirectory(profileDir);
+                        logger.debug("Deleted profile directory: {}", profileDir);
+                    }
+                } catch (Exception e) {
+                    logger.error("Error cleaning up profile directory for: " + profileName, e);
+                }
+            }
+        }
+    }
+    
+    /**
+     * Safely quit a WebDriver instance, ensuring all resources are cleaned up.
+     * Handles various edge cases and logs detailed information.
+     * @param driver The WebDriver instance to quit
+     */
+    /**
+     * Cleans up any running Chrome and ChromeDriver processes.
+     * This is a last resort when normal WebDriver cleanup fails.
+     */
+    private void cleanupChromeProcesses() {
+        logger.info("Cleaning up Chrome processes...");
+        try {
+            if (System.getProperty("os.name").toLowerCase().contains("win")) {
+                // Windows
+                Runtime.getRuntime().exec("taskkill /F /IM chrome.exe");
+                Runtime.getRuntime().exec("taskkill /F /IM chromedriver.exe");
+                Runtime.getRuntime().exec("taskkill /F /IM chrome_proxy.exe");
+            } else {
+                // Unix/Linux/Mac
+                Runtime.getRuntime().exec("pkill -f chrome");
+                Runtime.getRuntime().exec("pkill -f chromedriver");
+            }
+            // Give some time for processes to terminate
+            Thread.sleep(2000);
+        } catch (Exception e) {
+            logger.warn("Error during Chrome process cleanup: {}", e.getMessage());
+        }
+    }
+    
+    private void safeQuitDriver(WebDriver driver) {
+        if (driver == null) {
+            return;
+        }
+        
+        String sessionId = "unknown";
+        try {
+            if (driver instanceof RemoteWebDriver) {
+                SessionId id = ((RemoteWebDriver) driver).getSessionId();
+                if (id != null) {
+                    sessionId = id.toString();
+                }
+            }
+            
+            logger.info("Attempting to quit WebDriver session: {}", sessionId);
+            
+            // Try to close all windows first
+            try {
+                for (String handle : driver.getWindowHandles()) {
+                    try {
+                        driver.switchTo().window(handle);
+                        driver.close();
+                        logger.debug("Closed window: {}", handle);
+                        Thread.sleep(100); // Small delay between window closes
+                    } catch (Exception e) {
+                        logger.debug("Error closing window {}: {}", handle, e.getMessage());
+                    }
+                }
+            } catch (Exception e) {
+                logger.debug("Error while closing windows: {}", e.getMessage());
+            }
+            
+            // Then quit the driver
+            try {
+                driver.quit();
+                logger.info("Successfully quit WebDriver session: {}", sessionId);
+            } catch (Exception e) {
+                logger.warn("Error during driver.quit() for session {}: {}", sessionId, e.getMessage());
+                // Try to kill the process if possible
+                if (e.getMessage() != null && e.getMessage().contains("failed to kill")) {
+                    logger.warn("Attempting to forcefully terminate the browser process...");
+                    try {
+                        if (System.getProperty("os.name").toLowerCase().contains("win")) {
+                            Runtime.getRuntime().exec("taskkill /F /IM chrome.exe");
+                        } else {
+                            Runtime.getRuntime().exec("pkill -f chrome");
+                        }
+                        logger.info("Browser process terminated");
+                    } catch (Exception ex) {
+                        logger.error("Failed to terminate browser process: {}", ex.getMessage());
+                    }
+                }
+            }
+            
+        } catch (Exception e) {
+            logger.error("Unexpected error while quitting WebDriver (session: {}): {}", 
+                sessionId, e.getMessage(), e);
+        } finally {
+            // Ensure driver reference is cleared
+            try {
+                driver = null;
+            } catch (Exception e) {
+                // Ignore any errors during cleanup
+            }
+        }
+    }
+    
+    /**
+     * Helper method to detect if an exception is related to WebSocket/connection issues.
+     * @param e The exception to check
+     * @return true if the exception is connection-related
+     */
+    private boolean isConnectionError(WebDriverException e) {
+        if (e == null) return false;
+        
+        String errorMessage = e.getMessage();
+        if (errorMessage == null) return false;
+        
+        // Common connection-related error messages
+        return errorMessage.contains("Connection reset") ||
+               errorMessage.contains("chrome not reachable") ||
+               errorMessage.contains("session deleted because of page crash") ||
+               errorMessage.contains("disconnected: unable to connect to renderer") ||
+               errorMessage.contains("no such session") ||
+               errorMessage.contains("target window already closed") ||
+               errorMessage.contains("chrome not reachable");
+    }
+    
+    /**
+     * Check if a WebDriver session is active and responsive.
+     * Performs multiple checks to ensure the session is truly active.
+     * 
+     * @param driver The WebDriver instance to check
+     * @return true if the session is active and responsive, false otherwise
+     */
+    public boolean isSessionActive(WebDriver driver) {
+        if (driver == null) {
+            logger.debug("WebDriver is null, session is not active");
+            return false;
+        }
+        
+        try {
+            // 1. Basic session check with timeout
+            Timeouts timeouts = driver.manage().timeouts();
+            Duration originalImplicitWait = timeouts.getImplicitWaitTimeout();
+            
+            try {
+                // Set a short timeout for the check
+                timeouts.implicitlyWait(Duration.ofSeconds(2));
+                
+                // 1.1 Check if we can get the current URL (basic session check)
+                String currentUrl = driver.getCurrentUrl();
+                if (currentUrl == null || currentUrl.trim().isEmpty() || currentUrl.startsWith("data:")) {
+                    logger.debug("Invalid or empty URL detected: {}", currentUrl);
+                    return false;
+                }
+                
+                // 1.2 Check if the window handle is valid
+                try {
+                    driver.getWindowHandle();
+                } catch (NoSuchWindowException e) {
+                    logger.debug("No window handle found, session is not active");
+                    return false;
+                }
+                
+                // 1.3 Check if the session ID is still valid for RemoteWebDriver
+                if (driver instanceof RemoteWebDriver) {
+                    try {
+                        ((RemoteWebDriver) driver).getSessionId();
+                    } catch (Exception e) {
+                        logger.debug("Invalid session ID: {}", e.getMessage());
+                        return false;
+                    }
+                }
+                
+                // 2. Check JavaScript execution capability
+                try {
+                    // First check document.readyState
+                    boolean isDocumentReady = (boolean) ((JavascriptExecutor) driver).executeScript(
+                        "return document.readyState === 'complete'");
+                    
+                    // Additional check with navigator.userAgent
+                    Object userAgent = ((JavascriptExecutor) driver).executeScript("return navigator.userAgent");
+                    if (userAgent == null) {
+                        logger.debug("JavaScript execution returned null userAgent");
+                        return false;
+                    }
+                    
+                    // 3. Check window handles count
+                    int windowCount = driver.getWindowHandles().size();
+                    if (windowCount == 0) {
+                        logger.debug("No windows/tabs found in the browser");
+                        return false;
+                    }
+                    
+                    return isDocumentReady;
+                    
+                } catch (JavascriptException e) {
+                    logger.debug("JavaScript execution failed: {}", e.getMessage());
+                    // If we can execute JS but get an error, the session is still active
+                    return true;
+                } catch (UnreachableBrowserException e) {
+                    logger.error("Browser is unreachable: {}", e.getMessage());
+                    return false;
+                } catch (WebDriverException e) {
+                    logger.error("WebDriver error during JavaScript execution: {}", e.getMessage());
+                    return false;
+                }
+                
+            } finally {
+                // Restore original timeout
+                try {
+                    timeouts.implicitlyWait(originalImplicitWait);
+                } catch (Exception e) {
+                    logger.warn("Failed to restore original implicit wait: {}", e.getMessage());
+                }
+            }
+            
+        } catch (WebDriverException e) {
+            if (isConnectionError(e)) {
+                logger.debug("WebSocket connection error in session validation: {}", e.getMessage());
+            } else {
+                logger.debug("WebDriver exception during session validation: {}", e.getMessage());
+            }
+            return false;
+        } catch (Exception e) {
+            logger.debug("Unexpected exception during session validation: {}", e.getMessage());
+            return false;
+        }
+    }
+
+    public WebDriver createDriver(TaskType taskType) {
+        logger.info("Creating WebDriver for profile from calling method: {}: {}", Thread.currentThread().getName(), taskType.name());
+        return getDriver(taskType);
+    }
+
+    public JavascriptExecutor getJsExecutor(TaskType taskType) {
+        logger.info("Getting JavascriptExecutor for profile from calling method: {}: {}", Thread.currentThread().getName(), taskType.name());
+        WebDriver driver = getDriver(taskType);
+        if (driver instanceof JavascriptExecutor) {
+            return (JavascriptExecutor) driver;
+        }
+        throw new IllegalStateException("WebDriver instance is not a JavascriptExecutor");
+    }
+
+    public ConcurrentMap<TaskType, WebDriver> getProfileDriverMap() {
+        return profileDriverMap;
+    }
+
+    public ConcurrentMap<TaskType, WebDriver> updateProfileDriverEntry(TaskType taskType, WebDriver driver) {
+        profileDriverMap.put(taskType, driver);
+        return profileDriverMap;
+    }
+}

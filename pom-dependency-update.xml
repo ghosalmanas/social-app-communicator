@@ -1,0 +1,6 @@
+<!-- Add this dependency to your pom.xml file -->
+<dependency>
+    <groupId>org.apache.commons</groupId>
+    <artifactId>commons-pool2</artifactId>
+    <version>2.12.0</version>
+</dependency>

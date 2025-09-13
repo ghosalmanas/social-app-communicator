@@ -1,0 +1,13 @@
+	// https://www.youtube.com/watch?v=MjtJeDbSeSc
+
+				// https://www.youtube.com/watch?v=9N7ERYWbjuw
+				/*
+				 * Use CTRL + F  to open xpath search string window
+				
+				 * 1. //*[@id='Manas'] 2. //input[@id='Manas'] or //input[@type='Text']
+				 * 3. //input[@id='Manas'] | //input[@type='Text'] 4.
+				 * //input[@id='Manas'] and //input[@type='Text'] 5. (//*[Text()='Click
+				 * here to search']) [1] 6. //*[contains(@title,' JOB SUPPORTS')] 7.
+				 * //div[contains(@class,'aui-column-content-last')] 8.
+				 * //div[contains(@class, 'atag') and contains(@class ,'btag')]
+				 */

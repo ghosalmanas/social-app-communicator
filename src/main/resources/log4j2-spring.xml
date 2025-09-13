@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="INFO" monitorInterval="30">
+    <Properties>
+        <Property name="LOG_PATTERN">%d{yyyy-MM-dd HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n</Property>
+        <Property name="APP_LOG_ROOT">logs</Property>
+    </Properties>
+
+    <Appenders>
+        <Console name="ConsoleAppender" target="SYSTEM_OUT" follow="true">
+            <PatternLayout pattern="${LOG_PATTERN}" />
+        </Console>
+
+        <RollingFile name="FileAppender" fileName="${APP_LOG_ROOT}/application.log"
+                     filePattern="${APP_LOG_ROOT}/application-%d{yyyy-MM-dd}-%i.log">
+            <PatternLayout>
+                <Pattern>${LOG_PATTERN}</Pattern>
+            </PatternLayout>
+            <Policies>
+                <TimeBasedTriggeringPolicy interval="1" modulate="true" />
+                <SizeBasedTriggeringPolicy size="10MB" />
+            </Policies>
+            <DefaultRolloverStrategy max="10" />
+        </RollingFile>
+
+        <!-- Separate log file for Selenium WebDriver logs -->
+        <RollingFile name="SeleniumFileAppender" fileName="${APP_LOG_ROOT}/selenium.log"
+                     filePattern="${APP_LOG_ROOT}/selenium-%d{yyyy-MM-dd}-%i.log">
+            <PatternLayout>
+                <Pattern>${LOG_PATTERN}</Pattern>
+            </PatternLayout>
+            <Policies>
+                <TimeBasedTriggeringPolicy interval="1" modulate="true" />
+                <SizeBasedTriggeringPolicy size="10MB" />
+            </Policies>
+            <DefaultRolloverStrategy max="10" />
+        </RollingFile>
+    </Appenders>
+
+    <Loggers>
+        <!-- Application Loggers -->
+        <Logger name="com.wtf.app" level="debug" additivity="false">
+            <AppenderRef ref="FileAppender" />
+            <AppenderRef ref="ConsoleAppender" level="info" />
+        </Logger>
+
+        <!-- Selenium WebDriver Logger -->
+        <Logger name="org.openqa.selenium" level="warn" additivity="false">
+            <AppenderRef ref="SeleniumFileAppender" />
+        </Logger>
+
+        <!-- 3rd Party Loggers -->
+        <Logger name="org.springframework" level="warn" />
+        <Logger name="org.hibernate" level="warn" />
+
+        <Root level="info">
+            <AppenderRef ref="ConsoleAppender" />
+            <AppenderRef ref="FileAppender" />
+        </Root>
+    </Loggers>
+</Configuration>

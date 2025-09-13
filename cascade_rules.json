@@ -1,0 +1,336 @@
+{
+  "project": {
+    "name": "WA_TG_FB_SeleniumFreelancerAppV2",
+    "type": "Java Spring Boot",
+    "framework": "Selenium",
+    "main_packages": [
+      "com.wtf.app.config",
+      "com.wtf.app.service",
+      "com.wtf.app.util"
+    ]
+  },
+  
+  "coding_standards": {
+    "java": {
+      "indent_style": "spaces",
+      "indent_size": 4,
+      "max_line_length": 120,
+      "naming_conventions": {
+        "class": "PascalCase",
+        "method": "camelCase",
+        "variable": "camelCase",
+        "constant": "UPPER_CASE"
+      }
+    }
+  },
+
+  "dependencies": {
+    "management": "Maven",
+    "key_dependencies": {
+      "selenium": "latest",
+      "webdriver": "latest",
+      "spring_boot": "latest",
+      "test": {
+        "junit": "latest",
+        "mockito": "latest"
+      }
+    }
+  },
+
+  "code_organization": {
+    "config": "src/main/java/com/wtf/app/config",
+    "services": "src/main/java/com/wtf/app/service",
+    "utils": "src/main/java/com/wtf/app/util",
+    "resources": "src/main/resources"
+  },
+
+  "testing": {
+    "unit_tests": true,
+    "integration_tests": true,
+    "test_coverage": "80%"
+  },
+
+  "security": {
+    "api_keys": {
+      "store_in": "environment_variables",
+      "encryption": true
+    },
+    "sensitive_data": {
+      "mask_in_logs": true,
+      "encrypt_in_storage": true
+    }
+  },
+
+  "performance": {
+    "parallel_execution": true,
+    "webdriver_pool_size": 5,
+    "timeout_settings": {
+      "page_load": 30,
+      "element_wait": 10
+    }
+  },
+
+  "custom_preferences": {
+    "automated_testing": true,
+    "parallel_processing": true,
+    "multi_browser_support": true
+  },
+
+  "automation": {
+    "build": {
+      "auto_build": true,
+      "trigger": {
+        "code_changes": true,
+        "dependency_updates": true,
+        "configuration_changes": true
+      },
+      "commands": {
+        "default": "mvn clean install",
+        "test": "mvn clean install -DskipTests=false",
+        "fast": "mvn clean package -DskipTests=true",
+        "verify": "mvn verify",
+        "analyze": "mvn dependency:tree"
+      },
+      "verification": {
+        "enabled": true,
+        "checks": [
+          "file_structure",
+          "xml_syntax",
+          "java_syntax",
+          "code_quality",
+          "test_coverage",
+          "dependency_conflicts",
+          "security_scans"
+        ],
+        "rules": {
+          "file_structure": {
+            "description": "Verifies the complete file structure and syntax",
+            "files": ["*.xml", "*.java", "*.properties", "*.yml", "*.yaml"],
+            "checks": [
+              {
+                "type": "file",
+                "rule": "valid_structure",
+                "description": "Ensures the entire file has valid syntax and structure",
+                "severity": "error",
+                "actions": [
+                  {
+                    "type": "validate",
+                    "command": "mvn validate",
+                    "description": "Run Maven validation phase"
+                  },
+                  {
+                    "type": "check",
+                    "command": "mvn dependency:analyze",
+                    "description": "Check dependency tree for issues"
+                  }
+                ]
+              },
+              {
+                "type": "file",
+                "rule": "no_duplicate_entries",
+                "description": "Prevents duplicate entries in configuration files",
+                "severity": "error"
+              },
+              {
+                "type": "file",
+                "rule": "valid_encoding",
+                "description": "Ensures file uses UTF-8 encoding",
+                "severity": "error"
+              }
+            ]
+          },
+          "xml_syntax": {
+            "description": "Verifies XML syntax in configuration files",
+            "files": ["*.xml"],
+            "checks": [
+              {
+                "type": "xml",
+                "rule": "valid_structure",
+                "description": "Ensures XML files have valid structure with proper tag nesting",
+                "severity": "error"
+              },
+              {
+                "type": "xml",
+                "rule": "no_duplicate_tags",
+                "description": "Prevents duplicate tags in XML configuration",
+                "severity": "error"
+              },
+              {
+                "type": "xml",
+                "rule": "valid_attributes",
+                "description": "Ensures all XML attributes are valid and properly formatted",
+                "severity": "error"
+              }
+            ]
+          },
+          "java_syntax": {
+            "description": "Verifies Java syntax and common issues in source files",
+            "files": ["*.java"],
+            "checks": [
+              {
+                "type": "java",
+                "rule": "syntax_errors",
+                "description": "Detects Java syntax errors",
+                "severity": "error"
+              },
+              {
+                "type": "java",
+                "rule": "missing_braces",
+                "description": "Checks for missing braces in control structures",
+                "severity": "error"
+              },
+              {
+                "type": "java",
+                "rule": "unhandled_exceptions",
+                "description": "Detects unhandled exceptions",
+                "severity": "error"
+              },
+              {
+                "type": "java",
+                "rule": "unused_imports",
+                "description": "Detects unused imports",
+                "severity": "warning"
+              },
+              {
+                "type": "java",
+                "rule": "missing_closing_braces",
+                "description": "Checks for missing closing braces",
+                "severity": "error"
+              }
+            ]
+          }
+        },
+        "thresholds": {
+          "test_coverage": 80,
+          "code_quality": "high",
+          "dependency_conflicts": 0,
+          "security_issues": 0
+        }
+      },
+      "error_handling": {
+        "retry_count": 3,
+        "retry_delay": "5 seconds",
+        "notification": true,
+        "auto_recovery": true
+      }
+    },
+    "run": {
+      "auto_start": true,
+      "commands": {
+        "default": "java -jar target/app.jar",
+        "maven": "mvn spring-boot:run",
+        "build_and_run": "mvn clean install spring-boot:run"
+      },
+      "health_check": {
+        "enabled": true,
+        "interval": "30 seconds",
+        "checks": [
+          "service_status",
+          "resource_usage",
+          "performance_metrics",
+          "error_logs"
+        ],
+        "thresholds": {
+          "cpu_usage": 90,
+          "memory_usage": 90,
+          "response_time": "2 seconds",
+          "error_rate": 1
+        }
+      },
+      "recovery": {
+        "auto_restart": true,
+        "max_restarts": 3,
+        "restart_delay": "10 seconds",
+        "notification": true
+      }
+    },
+  },
+  "change_management": {
+    "change_tracking": {
+      "enabled": true,
+      "track_unaccepted": true,
+      "versioning": true,
+      "retention_period": "30 days"
+    },
+    "review_process": {
+      "required": true,
+      "auto_review": false,
+      "reviewers": ["senior_dev", "architect", "qa_lead"]
+    },
+    "change_categories": [
+      "code_modification",
+      "build_config",
+      "dependency_update",
+      "test_changes",
+      "documentation",
+      "configuration"
+    ],
+    "change_states": {
+      "proposed": {
+        "description": "Initial suggestion",
+        "action_required": true
+      },
+      "pending": {
+        "description": "Waiting for review",
+        "timeout": "3 days"
+      },
+      "rejected": {
+        "description": "Not accepted",
+        "preserve": true
+      },
+      "accepted": {
+        "description": "Approved and applied",
+        "auto_apply": true
+      },
+      "modified": {
+        "description": "Partly accepted with changes",
+        "requires_review": true
+      }
+    },
+    "memory_management": {
+      "store_unaccepted": true,
+      "preserve_rejected": true,
+      "version_history": true,
+      "cleanup_policy": {
+        "type": "time_based",
+        "period": "90 days"
+      }
+    },
+    "workflow": {
+      "stages": [
+        "proposal",
+        "review",
+        "decision",
+        "application",
+        "verification"
+      ],
+      "required_approvals": 2,
+      "auto_apply_threshold": 0.8
+    },
+    "validation": {
+      "code_quality": true,
+      "build_impact": true,
+      "test_coverage": true,
+      "security": true,
+      "performance": true,
+      "maintainability": true
+    }
+  }
+}
+        "decision",
+        "application",
+        "verification"
+      ],
+      "required_approvals": 2,
+      "auto_apply_threshold": 0.8
+    },
+    "validation": {
+      "code_quality": true,
+      "build_impact": true,
+      "test_coverage": true,
+      "security": true,
+      "performance": true,
+      "maintainability": true
+    }
+  }
+}

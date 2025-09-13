@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js" referrerpolicy="strict-origin-when-cross-origin"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        h1, h2, h3 {
+            color: #2c3e50;
+        }
+        .controller {
+            margin-bottom: 30px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
+        .endpoint {
+            margin: 15px 0;
+            padding: 10px;
+            background: white;
+            border-left: 4px solid #3498db;
+        }
+        .endpoint a {
+            color: #3498db;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .endpoint a:hover {
+            text-decoration: underline;
+        }
+        .response {
+            margin-top: 10px;
+            padding: 10px;
+            background: #f0f0f0;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            min-height: 20px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .method-get { color: #2ecc71; }
+        .method-post { color: #3498db; }
+        .method-put { color: #f39c12; }
+        .method-delete { color: #e74c3c; }
+        .description {
+            color: #666;
+            font-size: 0.9em;
+            margin: 5px 0;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>API Dashboard</h1>
+
+    <!-- Common Controller -->
+    <div class="controller">
+        <h2>Common Controller</h2>
+        <div class="endpoint">
+            <a href="#" onclick="return callEndpoint('/social-app/test', 'GET')" class="method-get">GET /social-app/test</a>
+            <div class="response" id="common-test"></div>
+        </div>
+        <div class="endpoint">
+            <a href="#" onclick="callEndpoint('/social-app/beans', 'GET')" class="method-get">GET /social-app/beans</a>
+            <div class="response" id="common-beans"></div>
+        </div>
+        <div class="endpoint">
+            <a href="#" onclick="callEndpoint('/social-app/kill', 'GET')" class="method-get">GET /social-app/kill</a>
+            <div class="response" id="common-kill"></div>
+        </div>
+        <div class="endpoint">
+            <a href="#" onclick="callEndpoint('/social-app/reset-browser-session/whatsapp', 'GET')" class="method-get">GET /social-app/reset-browser-session/whatsapp</a>
+            <div class="response" id="common-reset-session-wa"></div>
+        </div>
+        <div class="endpoint">
+            <a href="#" onclick="callEndpoint('/social-app/reset-browser-session/telegram', 'GET')" class="method-get">GET /social-app/reset-browser-session/telegram</a>
+            <div class="response" id="common-reset-session-tg"></div>
+        </div>
+        <div class="endpoint">
+            <a href="#" onclick="callEndpoint('/social-app/reset-browser-session/facebook', 'GET')" class="method-get">GET /social-app/reset-browser-session/facebook</a>
+            <div class="response" id="common-reset-session-fb"></div>
+        </div>
+        <div class="endpoint">
+            <a href="#" onclick="callEndpoint('/social-app/kill-app', 'GET')" class="method-get">GET /social-app/kill-app</a>
+            <div class="response" id="common-kill-app"></div>
+        </div>
+    </div>
+
+    <!-- Automation Controller -->
+    <div class="controller">
+        <h2>Automation Controller</h2>
+
+        <!-- Start All Automations -->
+        <div class="endpoint">
+            <a href="#" onclick="return callEndpoint('/api/automation/start', 'POST')" class="method-post">POST /api/automation/start</a>
+            <div class="description">Start all enabled automations in parallel</div>
+            <div class="response" id="automation-start"></div>
+        </div>
+        <div class="endpoint">
+            <a href="#" onclick="return callEndpoint('/api/automation/whatsapp/start', 'POST')" class="method-post">POST /api/automation/whatsapp/start</a>
+            <div class="description">Start only WhatsApp automations</div>
+            <div class="response" id="automation-whatsapp-start"></div>
+        </div>
+        <div class="endpoint">
+            <a href="#" onclick="return callEndpoint('/api/automation/telegram/start', 'POST')" class="method-post">POST /api/automation/telegram/start</a>
+            <div class="description">Start only Telegram automations</div>
+            <div class="response" id="automation-telegram-start"></div>
+        </div>
+
+        <!-- Health Check -->
+        <div class="endpoint">
+            <a href="#" onclick="return callEndpoint('/health', 'GET')" class="method-get">GET /health</a>
+            <div class="description">Check application health status</div>
+            <div class="response" id="health-check"></div>
+        </div>
+
+        <!-- Telegram Automation -->
+        <div class="endpoint">
+            <a href="#" onclick="return callEndpoint('/api/automation/telegram/start', 'POST')" class="method-post">POST /api/automation/telegram/start</a>
+            <div class="description">Start only Telegram automations</div>
+            <div class="response" id="telegram-automation-start"></div>
+        </div>
+
+        <!-- Fetch Contacts -->
+        <div class="endpoint">
+            <a href="#" onclick="return callEndpoint('/api/automation/fetch-contacts', 'POST')" class="method-post">POST /api/automation/fetch-contacts</a>
+            <div class="description">Fetch contacts and groups from all services</div>
+            <div class="response" id="fetch-contacts"></div>
+        </div>
+
+        <!-- WhatsApp Broadcast -->
+        <div class="endpoint">
+            <a href="#" onclick="return callEndpoint('/api/automation/whatsapp/broadcast', 'POST')" class="method-post">POST /api/automation/whatsapp/broadcast</a>
+            <div class="description">Start only WhatsApp broadcast</div>
+            <div class="response" id="whatsapp-broadcast"></div>
+        </div>
+
+        <!-- WhatsApp Fetch Start -->
+        <div class="endpoint">
+            <a href="#" onclick="return callEndpoint('/api/automation/whatsapp/fetch/start', 'POST')" class="method-post">POST /api/automation/whatsapp/fetch/start</a>
+            <div class="description">Start WhatsApp fetch automations</div>
+            <div class="response" id="whatsapp-fetch-start"></div>
+        </div>
+
+        <!-- WhatsApp Broadcast Start -->
+        <div class="endpoint">
+            <a href="#" onclick="return callEndpoint('/api/automation/whatsapp/broadcast/start', 'POST')" class="method-post">POST /api/automation/whatsapp/broadcast/start</a>
+            <div class="description">Start WhatsApp broadcast automations</div>
+            <div class="response" id="whatsapp-broadcast-start"></div>
+        </div>
+
+        <!-- Telegram Broadcast -->
+        <div class="endpoint">
+            <a href="#" onclick="return callEndpoint('/api/automation/telegram/broadcast', 'POST')" class="method-post">POST /api/automation/telegram/broadcast</a>
+            <div class="description">Start only Telegram broadcast</div>
+            <div class="response" id="telegram-broadcast"></div>
+        </div>
+
+        <!-- Telegram Fetch Start -->
+        <div class="endpoint">
+            <a href="#" onclick="return callEndpoint('/api/automation/telegram/fetch/start', 'POST')" class="method-post">POST /api/automation/telegram/fetch/start</a>
+            <div class="description">Start Telegram fetch automations</div>
+            <div class="response" id="telegram-fetch-start"></div>
+        </div>
+
+        <!-- Telegram Broadcast Start -->
+        <div class="endpoint">
+            <a href="#" onclick="return callEndpoint('/api/automation/telegram/broadcast/start', 'POST')" class="method-post">POST /api/automation/telegram/broadcast/start</a>
+            <div class="description">Start Telegram broadcast automations</div>
+            <div class="response" id="telegram-broadcast-start"></div>
+        </div>
+
+        <!-- WATG Fetch Start -->
+        <div class="endpoint">
+            <a href="#" onclick="return callEndpoint('/api/automation/watg/fetch/start', 'POST')" class="method-post">POST /api/automation/watg/fetch/start</a>
+            <div class="description">Start both WhatsApp and Telegram fetch automations</div>
+            <div class="response" id="watg-fetch-start"></div>
+        </div>
+
+        <!-- WATG Broadcast Start -->
+        <div class="endpoint">
+            <a href="#" onclick="return callEndpoint('/api/automation/watg/broadcast/start', 'POST')" class="method-post">POST /api/automation/watg/broadcast/start</a>
+            <div class="description">Start both WhatsApp and Telegram broadcast automations</div>
+            <div class="response" id="watg-broadcast-start"></div>
+        </div>
+    </div>
+
+    <!-- Facebook Controller -->
+    <div class="controller">
+        <h2>Facebook Controller</h2>
+        <div class="endpoint">
+            <a href="#" onclick="callEndpoint('/social-app/fb/broadcast/skillset', 'GET')" class="method-get">GET /social-app/fb/broadcast/skillset</a>
+            <div class="response" id="fb-broadcast-skillset"></div>
+        </div>
+        <div class="endpoint">
+            <a href="#" onclick="callEndpoint('/social-app/fb/broadcast/sensitive', 'GET')" class="method-get">GET /social-app/fb/broadcast/sensitive</a>
+            <div class="response" id="fb-broadcast-sensitive"></div>
+        </div>
+        <div class="endpoint">
+            <a href="#" onclick="callEndpoint('/social-app/fb/broadcast/offshore', 'GET')" class="method-get">GET /social-app/fb/broadcast/offshore</a>
+            <div class="response" id="fb-broadcast-offshore"></div>
+        </div>
+    </div>
+
+    <!-- Log Controller -->
+    <div class="controller">
+        <h2>Log Controller</h2>
+        <div class="endpoint">
+            <a href="#" onclick="callEndpoint('/api/logs', 'GET')" class="method-get">GET /api/logs</a>
+            <div class="response" id="logs"></div>
+        </div>
+    </div>
+
+    <!-- Telegram Controller -->
+    <div class="controller">
+        <h2>Telegram Controller</h2>
+        <div class="endpoint">
+            <a href="#" onclick="callEndpoint('/social-app/tg/traverse', 'GET')" class="method-get">GET /social-app/tg/traverse</a>
+            <div class="response" id="tg-traverse"></div>
+        </div>
+        <div class="endpoint">
+            <a href="#" onclick="callEndpoint('/social-app/tg/broadcast', 'GET')" class="method-get">GET /social-app/tg/broadcast</a>
+            <div class="response" id="tg-broadcast"></div>
+        </div>
+        <div class="endpoint">
+            <a href="#" onclick="callEndpoint('/social-app/tg/test', 'GET')" class="method-get">GET /social-app/tg/test</a>
+            <div class="response" id="tg-test"></div>
+        </div>
+    </div>
+
+    <!-- WhatsApp Controller -->
+    <div class="controller">
+        <h2>WhatsApp Controller</h2>
+        <div class="endpoint">
+            <a href="#" onclick="callEndpoint('/social-app/wa/traverse', 'GET')" class="method-get">GET /social-app/wa/traverse</a>
+            <div class="response" id="wa-traverse"></div>
+        </div>
+        <div class="endpoint">
+            <a href="#" onclick="callEndpoint('/social-app/wa/broadcast', 'GET')" class="method-get">GET /social-app/wa/broadcast</a>
+            <div class="response" id="wa-broadcast"></div>
+        </div>
+        <div class="endpoint">
+            <a href="#" onclick="callEndpoint('/social-app/wa/archive', 'GET')" class="method-get">GET /social-app/wa/archive</a>
+            <div class="response" id="wa-archive"></div>
+        </div>
+        <div class="endpoint">
+            <a href="#" onclick="callEndpoint('/social-app/wa/unarchive', 'GET')" class="method-get">GET /social-app/wa/unarchive</a>
+            <div class="response" id="wa-unarchive"></div>
+        </div>
+        <div class="endpoint">
+            <a href="#" onclick="callEndpoint('/social-app/wa/clear/already_traversed_or_broadcasted', 'GET')" class="method-get">GET /social-app/wa/clear/already_traversed_or_broadcasted</a>
+            <div class="response" id="wa-clear-traversed"></div>
+        </div>
+        <div class="endpoint">
+            <a href="#" onclick="callEndpoint('/social-app/wa/clear/already_traversed_in_db_file', 'GET')" class="method-get">GET /social-app/wa/clear/already_traversed_in_db_file</a>
+            <div class="response" id="wa-clear-traversed-db"></div>
+        </div>
+        <div class="endpoint">
+            <a href="#" onclick="callEndpoint('/social-app/wa/clear/already_broadcasted_in_db_file', 'GET')" class="method-get">GET /social-app/wa/clear/already_broadcasted_in_db_file</a>
+            <div class="response" id="wa-clear-broadcasted-db"></div>
+        </div>
+    </div>
+
+</div>
+
+<!-- Log Stream Section -->
+<div class="log-container">
+    <h2>Live Application Logs</h2>
+    <div class="log-controls">
+        <button id="toggleLogs" class="btn btn-primary">Pause Logs</button>
+        <button id="clearLogs" class="btn btn-secondary">Clear Logs</button>
+    </div>
+    <div id="logStream" class="log-stream"></div>
+</div>
+
+<style>
+    .log-container {
+        margin-top: 40px;
+        padding: 20px;
+        background: #f8f9fa;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .log-container h2 {
+        margin-top: 0;
+        color: #333;
+        border-bottom: 1px solid #dee2e6;
+        padding-bottom: 10px;
+    }
+    .log-controls {
+        margin-bottom: 15px;
+    }
+    .btn {
+        padding: 6px 12px;
+        margin-right: 10px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+    }
+    .btn-primary {
+        background-color: #007bff;
+        color: white;
+    }
+    .btn-secondary {
+        background-color: #6c757d;
+        color: white;
+    }
+    .btn:hover {
+        opacity: 0.9;
+    }
+    .log-stream {
+        height: 300px;
+        overflow-y: auto;
+        background: #1e1e1e;
+        color: #f0f0f0;
+        font-family: 'Courier New', monospace;
+        padding: 10px;
+        border-radius: 4px;
+        white-space: pre-wrap;
+        font-size: 13px;
+        line-height: 1.4;
+    }
+    .log-entry {
+        margin: 2px 0;
+        padding: 2px 0;
+        border-bottom: 1px solid #333;
+    }
+    .timestamp {
+        color: #888;
+        margin-right: 10px;
+    }
+    .log-level-debug { color: #9e9e9e; }
+    .log-level-info { color: #4caf50; }
+    .log-level-warn { color: #ff9800; }
+    .log-level-error { color: #f44336; }
+</style>
+
+<script>
+    // Global variables for log stream
+    let isPaused = false;
+    let logStream;
+
+    // Base URL for API endpoints - using current origin
+    const BASE_URL = window.location.origin;
+
+    // Function to call an endpoint and display the response
+    async function callEndpoint(endpoint, method = 'GET', data = null) {
+        // Get the clicked element
+        const clickedElement = window.event?.target || event?.srcElement;
+
+        // Find the parent endpoint div
+        const endpointDiv = clickedElement.closest('.endpoint');
+        // Find the response element within the endpoint div
+        let responseElement = endpointDiv ? endpointDiv.querySelector('.response') : null;
+
+        // If still not found, try to find by ID
+        if (!responseElement) {
+            const responseId = endpoint.replace(/[\/\-]/g, '-').replace(/^-+|-+$/g, '');
+            responseElement = document.getElementById(responseId) ||
+                           document.querySelector(`[data-endpoint="${endpoint}"]`);
+        }
+
+        if (!responseElement) {
+            console.error('Could not find response element for endpoint:', endpoint);
+            return false;
+        }
+
+        responseElement.textContent = 'Loading...';
+
+        try {
+            const config = {
+                method: method,
+                url: BASE_URL + endpoint,
+                data: data
+            };
+
+            const response = await axios({
+                ...config,
+                referrerPolicy: 'strict-origin-when-cross-origin',
+                transformResponse: [function (data) {
+                    // Try to parse as JSON, if it fails return as plain text
+                    try {
+                        return JSON.parse(data);
+                    } catch (e) {
+                        return data;
+                    }
+                }]
+            });
+
+            // Handle different response types
+            if (typeof response.data === 'string' || response.data instanceof String) {
+                responseElement.textContent = response.data;
+            } else {
+                responseElement.textContent = JSON.stringify(response.data, null, 2);
+            }
+        } catch (error) {
+            // Handle error response
+            let errorMessage = `Error: ${error.message}`;
+            if (error.response) {
+                if (typeof error.response.data === 'string' || error.response.data instanceof String) {
+                    errorMessage += `\n${error.response.data}`;
+                } else if (error.response.data) {
+                    errorMessage += `\n${JSON.stringify(error.response.data, null, 2)}`;
+                }
+            }
+            responseElement.textContent = errorMessage;
+        }
+
+        return false; // Prevent default link behavior
+    }
+
+    // Initialize when the page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize log stream
+        setupLogStream();
+
+        // Set up log controls
+        const toggleBtn = document.getElementById('toggleLogs');
+        const clearBtn = document.getElementById('clearLogs');
+        const logStream = document.getElementById('logStream');
+        let isPaused = false;
+
+        toggleBtn.addEventListener('click', function() {
+            isPaused = !isPaused;
+            toggleBtn.textContent = isPaused ? 'Resume Logs' : 'Pause Logs';
+            toggleBtn.classList.toggle('btn-secondary', !isPaused);
+            toggleBtn.classList.toggle('btn-primary', isPaused);
+        });
+
+        clearBtn.addEventListener('click', function() {
+            logStream.innerHTML = '';
+        });
+    });
+
+    // Set up log streaming
+    function setupLogStream() {
+        logStream = document.getElementById('logStream');
+        let eventSource;
+
+        // Add CSS for log entries if not already present
+        if (!document.getElementById('log-styles')) {
+            const style = document.createElement('style');
+            style.id = 'log-styles';
+            style.textContent = `
+                .log-entry {
+                    padding: 4px 8px;
+                    border-bottom: 1px solid #eee;
+                    font-family: monospace;
+                    font-size: 14px;
+                }
+                .log-entry:last-child {
+                    border-bottom: none;
+                }
+                .log-level-error { color: #dc3545; font-weight: bold; }
+                .log-level-warn { color: #ffc107; font-weight: bold; }
+                .log-level-info { color: #17a2b8; }
+                .log-level-debug { color: #6c757d; }
+                .timestamp { color: #6c757d; margin-right: 10px; }
+            `;
+            document.head.appendChild(style);
+        }
+
+        function connect() {
+            console.log('Connecting to SSE endpoint...');
+            eventSource = new EventSource('http://localhost:8080/api/logs');
+
+            eventSource.addEventListener('open', function(e) {
+                console.log('SSE connection opened');
+            });
+
+            // Handle log events
+            eventSource.addEventListener('log', function(event) {
+                if (isPaused) return;
+
+                const entry = document.createElement('div');
+                entry.className = 'log-entry';
+
+                try {
+                    // Try to parse the log entry (assuming format: [LEVEL] timestamp - message)
+                    const logMatch = event.data.match(/^(\[\w+\]) (\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}) - (.*)/);
+
+                    if (logMatch) {
+                        const [, level, timestamp, message] = logMatch;
+                        const levelClass = level.includes('ERROR') ? 'log-level-error' :
+                                          level.includes('WARN') ? 'log-level-warn' :
+                                          level.includes('INFO') ? 'log-level-info' : 'log-level-debug';
+
+                        entry.innerHTML = `
+                            <span class="timestamp">${timestamp}</span>
+                            <span class="${levelClass}">${level}</span>
+                            <span>${message}</span>
+                        `;
+                    } else {
+                        entry.textContent = event.data;
+                    }
+
+                    logStream.appendChild(entry);
+
+                    // Auto-scroll to bottom if not paused
+                    if (!isPaused) {
+                        logStream.scrollTop = logStream.scrollHeight;
+                    }
+                } catch (error) {
+                    console.error('Error processing log entry:', error);
+                }
+            });
+
+            // Handle ping events (keep-alive)
+            eventSource.addEventListener('ping', function(event) {
+                console.log('Received ping:', event.data);
+            });
+
+            eventSource.onerror = function(error) {
+                console.error('SSE Error:', error);
+                if (eventSource.readyState === EventSource.CLOSED) {
+                    console.log('SSE connection closed');
+                }
+                eventSource.close();
+                // Try to reconnect after a delay
+                console.log('Attempting to reconnect in 5 seconds...');
+                setTimeout(connect, 5000);
+            };
+        }
+
+        connect();
+
+        // Clean up on page unload
+        window.addEventListener('beforeunload', function() {
+            if (eventSource) {
+                eventSource.close();
+            }
+        });
+    }
+</script>
+</body>
+</html>
