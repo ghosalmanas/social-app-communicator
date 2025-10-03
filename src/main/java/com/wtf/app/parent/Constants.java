@@ -30,8 +30,10 @@ import com.wtf.app.util.ThreadLocalAutomationContext;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 @Component("constants")
@@ -47,6 +49,9 @@ public abstract class Constants {
     // Log4j2 logger
     protected static final Logger logger = LogManager.getLogger(Constants.class);
     public static final String DB_FILES = "dbFiles/";
+
+    @Value("${daysToSubtract:2}")
+    private static int daysToSubtract;
 
     protected final InitialSetup initialSetup;
 
@@ -221,8 +226,9 @@ public abstract class Constants {
 
     public static boolean isAlreadyUpdatedThePersonalGroupAndContactsForTheLast3Days(Set<String> socialWritableList){
 
-        return   socialWritableList.contains("group_traverse_already_date_" + LocalDate.now()) ||
-                        socialWritableList.contains("group_traverse_already_date_" + LocalDate.now().minusDays(1L))/* ||
+        return   /*socialWritableList.contains("group_traverse_already_date_" + LocalDate.now()) ||*/
+        IntStream.range(0,daysToSubtract+1).anyMatch(i->socialWritableList
+                .contains("group_traverse_already_date_" + LocalDate.now().minusDays(i)))/* ||
                         socialWritableList.contains("group_traverse_already_date_" + LocalDate.now().minusDays(2L))*/;
 
     }

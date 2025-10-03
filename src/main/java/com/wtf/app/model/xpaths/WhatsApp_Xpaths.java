@@ -17,49 +17,54 @@ public class WhatsApp_Xpaths implements XPathInterfaceWATG {
             //""+(Keys.SHIFT)+(Keys.ENTER)+(Keys.SHIFT)+
             /*" _NL_ "*/
 
-                     "I am a *Fullstack Proxy and Support individual direct Person with 16+ Years of Expertise IT Industry Experience*. WhatsApp: *+918274848227*"
+            "I am a *Fullstack Proxy and Support individual direct Person with 16+ Years of Expertise IT Industry Experience*. WhatsApp: *+918274848227*"
                     + " _NL_ "
-                             +" _NL_ "
+                    + " _NL_ "
                     //+ "and 7+ Years Experience in Interview Support and Job Support."
-                    + "** *100% GUARANTEED, SAFE AND SECURE* **,I take calls from _*USA,Canada,UK and India since last 9+ years*_ in Fullstack and Backend profiles in below areas:"
+                    + "*100% GUARANTEED, SAFE AND SECURE*, I take calls from _*USA, Canada, UK and India since last 9+ years*_ in Fullstack and Backend profiles in below areas:"
                     //+(Keys.SHIFT)+(Keys.ENTER)+(Keys.SHIFT)
                     + " _NL_ "
                     //+ "*>* Call/Message me directly (*Direct Contact*) for any *Fullstack or Backend requirements* on - "
                     + "*INTERVIEW SUPPORT (PROXY Call)*/ Assignment/ *Job Support/ Coding Test*/ Training/ Task"
                     //+(Keys.SHIFT)+(Keys.ENTER)+(Keys.SHIFT)
                     + " _NL_ "
-                    +" _NL_ "
+                    + " _NL_ "
                     //+ "*>* WhatsApp:- https://wa.me/+918274848227"
                     + "#WhatsApp: _*+918274848227*_"
-                    +" _NL_ "
+                    + " _NL_ "
                     //+(Keys.SHIFT)+(Keys.ENTER)+(Keys.SHIFT)
                     + " _NL_ "
-                   // + "*>* I am a *Java Fullstack Technical Lead Developer* expertise in"
+                    + "** 100% GENUINE : Feel free to Ask me any Technical Question, I am always ready to face and answer**"
+                    + " _NL_ "
+                    + " _NL_ "
+                    // + "*>* I am a *Java Fullstack Technical Lead Developer* expertise in"
                     //+(Keys.SHIFT)+(Keys.ENTER)+(Keys.SHIFT)+
                     + "*Technology Stacks* :"
                     + " _NL_ "
                     + "  1. *JAVA 8,11,17,21 and Complex Codings*"
                     + " _NL_ "
-                    +"  2. Spring, Spring Boot, Spring MVC, Spring AI"
+                    + "  2. Spring, Spring Boot, Spring MVC, Spring AI"
                     + " _NL_ "
-                    +"  3. Microservices, Soap, Rest Api"
+                    + "  3. Microservices, Soap, Rest Api"
                     + " _NL_ "
-                    +"  4. *Angular, React, Javascript*"
+                    + "  4. *Angular, React, Javascript*"
                     + " _NL_ "
-                    +"  5. Kafka, Spark"
+                    + "  5. Kafka, Spark"
                     + " _NL_ "
-                    +"  6. *AWS*/Azure/GCP"
+                    + "  6. *AWS*/Azure/GCP"
                     + " _NL_ "
-                    +"  7. Docker, Kubernetes, Redis, JPA, SQL and NoSQL Databases"
+                    + "  7. Docker, Kubernetes, Redis, JPA, SQL and NoSQL Databases"
                     + " _NL_ "
-                    +"  8. *Data Structures and Algorithms*"
+                    + "  8. *Data Structures and Algorithms*"
                     //+ "for - *INTERVIEW SUPPORT (PROXY Call)*/ Assignment/ *Job Support/ Coding Test*/ Training/ Tasks"
                     //+(Keys.SHIFT)+(Keys.ENTER)+(Keys.SHIFT)
                     //+(Keys.SHIFT)+(Keys.ENTER)+(Keys.SHIFT)
                     + " _NL_ "
                     //+ "*>* I am a *Professional Direct Proxy* and I do *Prompting and with Premium Otter or Google Transcript * wth Screen Control for coding."
                     //+ "*>* Besides, I'm a *Professional Java Fullstack Proxy*"
-                    + "*Process*: - Prompting & Transcript with *Otter Premium* with *100% _IN-VISIBLE and UN—TRACEABLE_ Screen Control app* for live coding. WhatsApp: *+918274848227*";
+                    + "*Process*: - Prompting & Transcript with *Otter Premium* with *100% _IN-VISIBLE and UN-TRACEABLE_ Screen Control app* for live coding."
+                    + " _NL_ "
+                    +" WhatsApp: *+918274848227*";
     //+(Keys.SHIFT)+(Keys.ENTER)+(Keys.SHIFT)
     //+(Keys.SHIFT)+(Keys.ENTER)+(Keys.SHIFT)
     //+ "*> 14* years of *Expertise Industry Experience* as *Java Fullstack Technical Architect*"

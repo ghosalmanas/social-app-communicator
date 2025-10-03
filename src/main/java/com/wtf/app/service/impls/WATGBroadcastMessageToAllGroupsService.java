@@ -193,11 +193,15 @@ public class WATGBroadcastMessageToAllGroupsService extends WATGParent implement
                     logger.info("Cleared the message box");
                 }catch (Exception e) {
                     logger.error("Failed to clear the message box ",e);
-                    logger.info("Clearing the message box using keyboard using ctrl + a and backspace");
-                    Actions action = new Actions(driver);
-                    action.keyDown(Keys.CONTROL).sendKeys("a").keyUp(Keys.CONTROL).perform();
-                    action.keyDown(Keys.BACK_SPACE).perform();
-                    action.release();
+                    logger.info("trying to clear the message box using keyboard using ctrl + a and backspace");
+                    try{
+                        Actions action = new Actions(ThreadLocalAutomationContext.getContext().getDriver());
+                        action.keyDown(Keys.CONTROL).sendKeys("a").keyUp(Keys.CONTROL).perform();
+                        action.keyDown(Keys.BACK_SPACE).perform();
+                        action.release();
+                    }catch (Exception ex) {
+                        logger.error("Failed to clear the message box using keyboard using ctrl + a and backspace",ex);
+                    }
                 }
             }
             Thread.sleep(200);

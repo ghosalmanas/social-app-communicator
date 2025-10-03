@@ -36,6 +36,8 @@ public abstract class WATGParent extends WATGCommonUtils {
     private static final Logger logger = LogManager.getLogger(WATGParent.class);
     private static final AtomicInteger instanceCounter = new AtomicInteger(0);
     private final int instanceId = instanceCounter.incrementAndGet();
+    private final String pinnedGroup = "MG Communications";//Hard-coded
+    private final String pinnedGroupSecond = "Akash Kumar";//Hard-coded
 
     private final ThreadLocal<Set<String>> alreadyTraversedGroupsOnlyThreadLocal = ThreadLocal.withInitial(HashSet::new);
     private final ThreadLocal<Set<String>> alreadyTraversedGroupsAndIndividualsThreadLocal = ThreadLocal.withInitial(TreeSet::new);
@@ -298,10 +300,8 @@ public abstract class WATGParent extends WATGCommonUtils {
 
                 logger.info("PINNED_GROUP_RETRIEVED :{}", pinnedGroupInXpath);
 
-                String pinnedGroup = "MG Communications";//Hard-coded
                 logger.info("PINNED_GROUP_HARD_CODED :{}", pinnedGroup);
 
-                String pinnedGroupSecond = "Akash Kumar";//Hard-coded
                 logger.info("PINNED_GROUP_SECOND_HARD_CODED :{}", pinnedGroupSecond);
 
                 // Mainly useful for traversal and message posting
@@ -392,7 +392,7 @@ public abstract class WATGParent extends WATGCommonUtils {
 
                 while (hasMoreElementsToTraverse) {
 
-                    Thread.sleep(getSLEEP_TIME_MS()/ 4);
+                    Thread.sleep(getSLEEP_TIME_MS()/ 10L);
 
                     localDateTime = getLocalTimeInFormat.get(); //update time for each execution
 
@@ -560,8 +560,8 @@ public abstract class WATGParent extends WATGCommonUtils {
                                     "Check Already Exists:: Continuous next targetted for first/last group : groupNameExceptIndv :" + currentGroupNameExceptIndv
                                             + " countAlreadyExists: " + countAlreadyExists + " hasMoreElementsToTraverse: " + hasMoreElementsToTraverse);
                             String reason = "ALREDY_TRAVERSED_FOR_THE_DAY";
-                            logger.info("Eligibility Failed......Reason : ***** " + reason + " *****" + " TaskType: " + taskType);
-                            logger.info("Current Group " + currentGroupNameExceptIndv + " has been " + reason + " ::Present in the TraversedList: \n" + alreadyTraversedGroupsOnly + " TaskType: " + taskType);
+                            logger.info("\n\n ************ Eligibility Failed......Reason : ***** " + reason + " *****" + " TaskType: " + taskType+"**************************");
+                            logger.info("\nCurrent Group " + currentGroupNameExceptIndv + " has been " + reason + " ::Present in the TraversedList: \n" + alreadyTraversedGroupsOnly + " TaskType: " + taskType);
                             lastVisitedButNonSentGroupPrevToSuccessToMoveBack = currentGroupNameExceptIndv;
                             Thread.sleep(getSLEEP_TIME_MS()/10);
 
@@ -736,7 +736,7 @@ public abstract class WATGParent extends WATGCommonUtils {
                 logger.error("Error during group traversal" + " TaskType: " + taskType, e);
                 throw e;
             } finally {
-                quitDriver();
+                //quitDriver();
             }
             //driver.close();
             return false;
@@ -817,8 +817,11 @@ public abstract class WATGParent extends WATGCommonUtils {
                 List<WebElement> individualUsers = febxs(
                         getxPathInterface().getFIND_INDV_USER_NAME_RIGHT_TOP());
                 if (individualUsers.isEmpty()) {
-                    logger.error("URGENT_INTERVENTION_REQUIRED: ERROR in PAGE_FOCUS OR PAGE_LOAD" + " TaskType: " + taskType);//null for TG.NA
-                    doSomeAwaking(lastVisitedGroup, 4);//Simply search and reload
+                    logger.error("ALERT: individualUsers is Empty: URGENT_INTERVENTION_REQUIRED: ERROR due to may be PAGE_FOCUS OR PAGE_LOAD" + " TaskType: " + taskType+" : lastVisitedGroup : "+lastVisitedGroup+" : "+ThreadLocalAutomationContext.getContext().getTaskType());//null for TG.NA
+                    if(!lastVisitedGroup.isEmpty() && !lastVisitedGroup.equalsIgnoreCase(pinnedGroup) && !lastVisitedGroup.equalsIgnoreCase(pinnedGroupSecond)) {
+                       Thread.sleep(5000);
+                        doSomeAwaking(lastVisitedGroup, 4);//Simply search and reload
+                    }
                     return null;
                 }
                 String individualGroupName = individualUsers.isEmpty() ? null : individualUsers.getFirst().getText();//Optional. Not required
@@ -893,7 +896,7 @@ public abstract class WATGParent extends WATGCommonUtils {
     }
 
 
-    boolean validateTheEligibility(Set<String> alreadyTraversedGroupsOnly, String groupNameExceptIndv) {
+    boolean validateTheEligibility(Set<String> alreadyTraversedGroupsOnly, String groupNameExceptIndv) throws InterruptedException {
 /*
         boolean neverTraversed = alreadyTraversedGroupsOnly.stream()
                 .noneMatch(sentGroup -> sentGroup.trim().toLowerCase()
@@ -958,7 +961,8 @@ public abstract class WATGParent extends WATGCommonUtils {
                 reason = "ALREDY_PRESENT_IN_NEGLECT_TO_JOIN_GROUP_LIST";
             }
 
-            logger.info("Eligibility Failed......Reason : ***** " + reason + " *****" + " TaskType: " + taskType);
+            logger.info("\n************ Eligibility Failed......Reason : ***** " + reason + " *****" + " TaskType: " + taskType+"**************************\n");
+            Thread.sleep(getSLEEP_TIME_MS()/10L);
         }
 
         return isEligibleToShootToEachGroup;

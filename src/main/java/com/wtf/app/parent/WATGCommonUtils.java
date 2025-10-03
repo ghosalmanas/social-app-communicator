@@ -14,6 +14,7 @@ import org.openqa.selenium.interactions.Actions;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.awt.*;
@@ -24,6 +25,7 @@ import java.time.LocalDate;
 import java.util.*;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -38,7 +40,10 @@ public abstract class WATGCommonUtils extends SocialParentCommonUtils {
     private static final String BACK_OR_TITLE_BACK_IF_DUPLICATES = "//*[@aria-label='Back' or @title='Back']";
     protected static final String EXACT_BACK_BUTTON = "//div[@class='back-button']/button[@title='Back']";
 
-    protected XPathInterfaceWATG xPathInterfaceWATG;
+	@Value("${daysToSubtract:2}")
+	private int daysToSubtract;
+
+	protected XPathInterfaceWATG xPathInterfaceWATG;
     protected String messageToSearch;
 
     protected FlowType flowType;
@@ -46,8 +51,8 @@ public abstract class WATGCommonUtils extends SocialParentCommonUtils {
     protected boolean isRequiredToUpdatePersonalGroupsAndContacts = false;
 
 	protected ParallelWebDriverManager parallelWebDriverManager;
-    
-    @Autowired
+
+	@Autowired
     public WATGCommonUtils( 
                          InitialSetup initialSetup,
 						   ParallelWebDriverManager parallelWebDriverManager) {
@@ -672,11 +677,12 @@ public String waitIdentifyAndClickOnThePinnedElement(String waPinnedSpanTitle) t
 	}
 
 	public Set<String> clearUpdateCurrDateAndReloadFile(String fileNameWithExtension, String messageFormatInsideFile,
-			Set<String> groupsAlreadyMessageSentForTheDaySet, boolean clearExistingContent) {
+			 Set<String> groupsAlreadyMessageSentForTheDaySet, boolean clearExistingContent) {
 
-		if (groupsAlreadyMessageSentForTheDaySet.contains(messageFormatInsideFile + LocalDate.now())
-				|| groupsAlreadyMessageSentForTheDaySet
-						.contains(messageFormatInsideFile + LocalDate.now().minusDays(1l))/*|| groupsAlreadyMessageSentForTheDaySet
+		Set<String> finalGroupsAlreadyMessageSentForTheDaySet = groupsAlreadyMessageSentForTheDaySet;
+		if (/*groupsAlreadyMessageSentForTheDaySet.contains(messageFormatInsideFile + LocalDate.now())
+				||*/ IntStream.range(0,daysToSubtract+1).anyMatch(i-> finalGroupsAlreadyMessageSentForTheDaySet
+						.contains(messageFormatInsideFile + LocalDate.now().minusDays(i)))/*|| groupsAlreadyMessageSentForTheDaySet
 						.contains(messageFormatInsideFile + LocalDate.now().minusDays(2l))*/) {
 			logger.info("ClearUpdateCurrDateAndReloadFile : Message Already Posted within 2 Days : "+groupsAlreadyMessageSentForTheDaySet+ " fileNameWithExtension: "+fileNameWithExtension);
 			return groupsAlreadyMessageSentForTheDaySet;
@@ -755,7 +761,7 @@ public String waitIdentifyAndClickOnThePinnedElement(String waPinnedSpanTitle) t
 	public boolean searchAndClickOnGroup(String oldGroupString) {
 
 		try {
-			logger.info( "searchAndClickOnGroup start : " + oldGroupString);
+			logger.info( "searchAndClickOnGroup start : " + oldGroupString+" : "+ThreadLocalAutomationContext.getContext().getTaskType());
 			Thread.sleep(getSLEEP_TIME_MS()+1000L);
 			WebElement webElement = searchAGroupInSearchBar(oldGroupString);
 			// driver.manage().timeouts().implicitlyWait(SLEEP_TIME, TimeUnit.MILLISECONDS);
@@ -860,7 +866,7 @@ public String waitIdentifyAndClickOnThePinnedElement(String waPinnedSpanTitle) t
 
 		// 1.Search groupName in SearchBox
 		Thread.sleep(getSLEEP_TIME_MS());
-		logger.info( "Old Group typing in Search box: " + oldGroupString);
+		logger.info( "Old Group typing in Search box: " + oldGroupString +" : "+ ThreadLocalAutomationContext.getContext().getTaskType());
 		webElement.sendKeys(oldGroupString + "\n");
 		Thread.sleep(getSLEEP_TIME_MS());
 		return webElement;

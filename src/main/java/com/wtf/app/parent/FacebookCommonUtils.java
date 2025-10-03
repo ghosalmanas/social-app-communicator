@@ -25,6 +25,7 @@ import java.time.LocalDate;
 import java.util.*;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 @Component
 public abstract class FacebookCommonUtils extends SocialParentCommonUtils {
@@ -49,6 +50,9 @@ public abstract class FacebookCommonUtils extends SocialParentCommonUtils {
 
     @Value("${facebook.group.broadcast.sensitive.enabled:false}")
     private boolean facebookSensitiveBroadcastEnabled;
+
+    @Value("${daysToSubtract:2}")
+    private int daysToSubtract;
 
     @Autowired
     @Lazy
@@ -79,11 +83,13 @@ public abstract class FacebookCommonUtils extends SocialParentCommonUtils {
     }
 
     ;
-    protected final int CONSECUTIVE_PENDING_TERMINATION_COUNTER = 20;
-    protected boolean isAlreadyUpdatedThePersonalGroupAndContactsForTheLast2DaysWA = getGroupsAlreadyMessageSentForTheDaySetFB()
+    protected final int CONSECUTIVE_PENDING_TERMINATION_COUNTER = 5;
+
+    protected boolean isAlreadyUpdatedThePersonalGroupAndContactsForTheLast2DaysWA = /*getGroupsAlreadyMessageSentForTheDaySetFB()
             .contains("group_traverse_already_date_" + LocalDate.now())
-            || getGroupsAlreadyMessageSentForTheDaySetFB()
-            .contains("group_traverse_already_date_" + LocalDate.now().minusDays(1l));
+            ||*/
+            IntStream.range(0,daysToSubtract+1).anyMatch(i->getGroupsAlreadyMessageSentForTheDaySetFB()
+            .contains("group_traverse_already_date_" + LocalDate.now().minusDays(i)));
 
     protected abstract Set<String> getAlreadyTraversedGroupsOnlyAndUpdateDate();
 
@@ -403,8 +409,11 @@ public abstract class FacebookCommonUtils extends SocialParentCommonUtils {
 
 
     public Set<String> clearUpdateCurrDateAndReloadFile(String fileNameWithExtension, String messageFormatInsideFile, Set<String> groupsAlreadyMessageSentForTheDaySet, boolean clearExistingContent) {
-        if (groupsAlreadyMessageSentForTheDaySet.contains(messageFormatInsideFile + LocalDate.now())
-                || groupsAlreadyMessageSentForTheDaySet.contains(messageFormatInsideFile + LocalDate.now().minusDays(1l))/*|| groupsAlreadyMessageSentForTheDaySet
+        Set<String> finalGroupsAlreadyMessageSentForTheDaySet = groupsAlreadyMessageSentForTheDaySet;
+        if (/*groupsAlreadyMessageSentForTheDaySet.contains(messageFormatInsideFile + LocalDate.now())
+        ||*/ IntStream.range(0,daysToSubtract+1).anyMatch(i-> finalGroupsAlreadyMessageSentForTheDaySet
+                .contains(messageFormatInsideFile + LocalDate.now().minusDays(i)))
+            /*|| groupsAlreadyMessageSentForTheDaySet
                                 .contains(messageFormatInsideFile + LocalDate.now().minusDays(2l))*/) {
             logger.info("ClearUpdateCurrDateAndReloadFile : Message Already Posted within 2 Days : " + groupsAlreadyMessageSentForTheDaySet + " fileNameWithExtension: " + fileNameWithExtension);
             return groupsAlreadyMessageSentForTheDaySet;
