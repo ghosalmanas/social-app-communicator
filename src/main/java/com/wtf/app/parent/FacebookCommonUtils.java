@@ -51,6 +51,9 @@ public abstract class FacebookCommonUtils extends SocialParentCommonUtils {
     @Value("${facebook.group.broadcast.sensitive.enabled:false}")
     private boolean facebookSensitiveBroadcastEnabled;
 
+    @Value("${facebook.group.broadcast.sensitive.enabled.with.proxy.message:false}")
+    protected boolean isFacebookSensitiveBroadcastEnabledWithProxyMessage;
+
     @Value("${daysToSubtract:2}")
     private int daysToSubtract;
 

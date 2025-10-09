@@ -123,6 +123,11 @@ public class FacebookBroadcastToSensitiveGroupAnnonymService extends FacebookBro
 
     @Override
     public String getMessageToBroadcast() {
+        if(isFacebookSensitiveBroadcastEnabledWithProxyMessage){
+            logger.info("isFacebookSensitiveBroadcastEnabledWithProxyMessage is true");
+            return new Facebook_Xpaths()
+                    .getMESSAGE_TO_EACH_GROUP_TO_ADVERTISE_FOR_SELF_SKILLSET_FOR_PROXY_SUPPORT();
+        }
         return new Facebook_Xpaths()
                 .getMESSAGE_TO_EACH_RESTRICTED_SENSITIVE_TRAINING_GROUP_TO_ADVERTISE_FOR_SELF_SKILLSET_FOR_PROXY_SUPPORT_ANNONYM();
     }
