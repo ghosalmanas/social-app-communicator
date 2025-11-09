@@ -41,7 +41,7 @@ public class WhatsApp_Xpaths implements XPathInterfaceWATG {
                     //+(Keys.SHIFT)+(Keys.ENTER)+(Keys.SHIFT)+
                     + "*Technology Stacks* :"
                     + " _NL_ "
-                    + "  1. *JAVA 8,11,17,21 and Complex Codings*"
+                    + "  1. *JAVA 8,11,17,21,24 and Complex Codings and _*LeetCode*_ problem solving*"
                     + " _NL_ "
                     + "  2. Spring, Spring Boot, Spring MVC, Spring AI"
                     + " _NL_ "
@@ -118,6 +118,8 @@ public class WhatsApp_Xpaths implements XPathInterfaceWATG {
 
     private final String SPAN_DATA_TESTID_SEND = "//div[@aria-label='Send']";
     private final String DIV_TITLE_TYPE_A_MESSAGE = "//div[@aria-placeholder='Type a message']";
+    private final String FIND_MESSAGE_TEXT_NOT_ALLOWED_IN_POST_BOX = "//*[text()='Text not allowed']";
+
     private final String LABEL_MAGNIFYING_GLASS_SEARCH_BUTTON_XPATH = "//*[@aria-label='Search input textbox']/parent::div";
     //"//button[@aria-label='Search or start new chat']";
     private final String BACK_ARROW__BESIDE_MAGNIFYING_GLASS_SEARCH_BUTTON_XPATH = "//div[@aria-label='Chat list']";
@@ -125,8 +127,8 @@ public class WhatsApp_Xpaths implements XPathInterfaceWATG {
     private final String XPATH_SEARCH = "//*[@aria-label='Search input textbox']";
     //"//*[@id=\"side\"]/div[1]/div/div/div[2]/div/div[1]/p";
     private final String SELECT_FIRST_RESULT_FROM_SEARCH_OF_PREVIOUS_GROUP = "//span[contains(@title,'%s')]";
-    private final String CLEAR_SEARCH_OF_PREVIOUS_GROUP_AFTER_SELECTION = "//span[@data-icon='close-refreshed']";
-
+    private final String CLEAR_SEARCH_OF_PREVIOUS_GROUP_AFTER_SELECTION = "//button[@aria-label=‘Cancel search’]";
+            //"//span[@data-icon='close-refreshed']";
     private final String XPATH_GROUP_CONTACTS_MOUSEHOVER = "//*[@id=\"main\"]/header/div[2]/div[2]/span";
     private final String CHROME_DRIVE_PATH = "D:\\SupportDetails\\Support_ExtractSupportProxyContacts\\chromedriver_win64\\chromedriver.exe";
 
@@ -410,5 +412,10 @@ public class WhatsApp_Xpaths implements XPathInterfaceWATG {
     @Override
     public String getSOCIAL_MEDIA_SCANNER_IDENTIFIER_AFTER_URL() {
         return WHATSAPP_SCANNER_IDENTIFIER;
+    }
+
+    @Override
+    public String getFIND_MESSAGE_TEXT_NOT_ALLOWED_IN_POST_BOX() {
+        return FIND_MESSAGE_TEXT_NOT_ALLOWED_IN_POST_BOX;
     }
 }

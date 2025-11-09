@@ -54,6 +54,9 @@ public abstract class FacebookCommonUtils extends SocialParentCommonUtils {
     @Value("${facebook.group.broadcast.sensitive.enabled.with.proxy.message:false}")
     protected boolean isFacebookSensitiveBroadcastEnabledWithProxyMessage;
 
+    @Value("${facebook.group.broadcast.clear.pending.staged.message.before.posting:false}")
+    protected boolean wantToClearAllPendingPostsDumpedInEachGroup;
+
     @Value("${daysToSubtract:2}")
     private int daysToSubtract;
 
@@ -79,13 +82,13 @@ public abstract class FacebookCommonUtils extends SocialParentCommonUtils {
         SUCCESS, FAILED, ONLY_DUMPS_PENDING_NEVER_POSTED
     }
 
-    ;
+
 
     public enum MSG_POST_STAGES_LOG {
         _1_MSG_READY_TO_POST, _2_MSG_POSTED_SUCCESSFULLY, _3_MSG_POST_FAILED, _4_MSG_POST_PENDING, _5_MSG_POSTED_PRIVATE_GROUP, _5_MSG_POSTING_PUBLIC_GROUP, _5_MSG_POSTING_GENERIC_GROUP, _5_MSG_POSTING_WRONG_GROUP
     }
 
-    ;
+
     protected final int CONSECUTIVE_PENDING_TERMINATION_COUNTER = 5;
 
     protected boolean isAlreadyUpdatedThePersonalGroupAndContactsForTheLast2DaysWA = /*getGroupsAlreadyMessageSentForTheDaySetFB()
@@ -111,25 +114,39 @@ public abstract class FacebookCommonUtils extends SocialParentCommonUtils {
 
         logger.info("Logging into Facebook..." + instanceFB.getEnumFlowType().name());
 
-        List<FacebookCommonUtils> facebookCommonUtilsList = new LinkedList<>();
+        Set<FacebookCommonUtils> facebookCommonUtilsList = new LinkedHashSet<>();
         facebookCommonUtilsList.add(instanceFB);
 
+        logger.info("Initial FacebookBroadcastToSensitiveGroupAnnonymService added to facebookCommonUtilsList :{}",facebookCommonUtilsList.size() );
         if (onlyAllowAllBroadcastsWATGFB || (facebookBroadcastEnabled && facebookSensitiveBroadcastEnabled)) {
             //utilize the same login and avoid duplicate login, instead append the other instance to the list
             if (instanceFB instanceof FacebookBroadcastSelfSkillSetService) {
-
+                logger.info("Passed instanceFB instanceof FacebookBroadcastSelfSkillSetService, so adding the sensitive broadcast instance to the list");
                 updateTaskSpecificFields(facebookBroadcastToSensitiveGroupAnnonymService, TaskType.FACEBOOK_BROADCAST_SENSITIVE_AD);
                 facebookCommonUtilsList.add(facebookBroadcastToSensitiveGroupAnnonymService);
-                logger.info("FacebookBroadcastToSensitiveGroupAnnonymService added to facebookCommonUtilsList");
+                logger.info("Updated updateTaskSpecificFields FacebookBroadcastToSensitiveGroupAnnonymService added to facebookCommonUtilsList :{}",facebookCommonUtilsList.size() );
 
-            } else if (instanceFB instanceof FacebookBroadcastToSensitiveGroupAnnonymService) {
+            } //Below should not work as called from ParallelAutomationService
+            else if (instanceFB instanceof FacebookBroadcastToSensitiveGroupAnnonymService) {
+                logger.info("Passed instanceFB instanceof FacebookBroadcastToSensitiveGroupAnnonymService, so adding the self broadcast instance to the list");
                 facebookCommonUtilsList.add(facebookBroadcastSelfSkillSetService);
-                logger.info("FacebookBroadcastSelfSkillSetService added to facebookCommonUtilsList");
+                logger.info("Updated FacebookBroadcastSelfSkillSetService added to facebookCommonUtilsList: {}",facebookCommonUtilsList.size());
+            }
+
+            //Control the list explicitly if above logic does not work for instance of as per line number 177,164
+            if(facebookCommonUtilsList.size() >=2 && facebookCommonUtilsList.contains(instanceFB) && facebookCommonUtilsList.contains(facebookBroadcastToSensitiveGroupAnnonymService)){
+                logger.info("Multiple FacebookCommonUtils added to facebookCommonUtilsList: {} : {}" ,facebookCommonUtilsList.size(), facebookCommonUtilsList);
+            }else {
+                logger.info("Single FacebookCommonUtils added to facebookCommonUtilsList so adding sensitive separately: {}",facebookCommonUtilsList.size());
+                //Adding the sensitive group
+                facebookCommonUtilsList.clear();
+                facebookCommonUtilsList.add(instanceFB);
+                updateTaskSpecificFields(facebookBroadcastToSensitiveGroupAnnonymService, TaskType.FACEBOOK_BROADCAST_SENSITIVE_AD);
+                facebookCommonUtilsList.add(facebookBroadcastToSensitiveGroupAnnonymService);
             }
         }
 
-        logger.info("facebookCommonUtilsList size {}", facebookCommonUtilsList.size());
-
+        logger.info("facebookCommonUtilsList size {} : {}", facebookCommonUtilsList.size(), facebookCommonUtilsList);
 
         for (FacebookCommonUtils instance : facebookCommonUtilsList) {
 
@@ -143,8 +160,6 @@ public abstract class FacebookCommonUtils extends SocialParentCommonUtils {
                 logger.info("runFacebookAction : TaskType {}, flowType {}", instance.getTaskType(), instance.getEnumFlowType());
 
                 //AutomationContext context = ThreadLocalAutomationContext.getContext();
-                boolean wantToClearAllPendingPostsStaggedInEachGroup = false;//use it a separate initiator class
-
                 // Set up Facebook groups to post, you must be a member of the group
 
                 Result result = extractFBTaskInformation(instance);
@@ -164,7 +179,7 @@ public abstract class FacebookCommonUtils extends SocialParentCommonUtils {
                 //delete All Pending Posts from each group
 
 
-                if (wantToClearAllPendingPostsStaggedInEachGroup) {
+                if (wantToClearAllPendingPostsDumpedInEachGroup) {
                     deleteAllPendingPosts(result.groupIdList());
                 }
 
@@ -229,15 +244,15 @@ public abstract class FacebookCommonUtils extends SocialParentCommonUtils {
 
         // Set up text content to post
         String message = instance.getMessageToBroadcast();
-        Result result = new Result(groupIdNamesMapping, groupIdList, message);
-        return result;
+        return new Result(groupIdNamesMapping, groupIdList, message);
     }
 
     private record Result(Map<String, String> groupIdNamesMapping, List<String> groupIdList, String message) {
     }
 
     private static Map<String, String> getGroupIdNamesMapping(FacebookCommonUtils instance) {
-        return instance.getBroadcastGroupIdNameFBSet().stream().filter(i -> i != null).peek(i -> System.out.println(i)).collect(Collectors.toMap(i -> i.split(STRING_SEPARATOR)[0], i -> i.split(STRING_SEPARATOR)[1]));
+        logger.info("FacebookCommonUtils instance of sensitive: {}, instance of self: {}, getGroupIdNamesMapping size: {}",instance instanceof FacebookBroadcastToSensitiveGroupAnnonymService, instance instanceof FacebookBroadcastSelfSkillSetService, instance.getBroadcastGroupIdNameFBSet().size());
+        return instance.getBroadcastGroupIdNameFBSet().stream().filter(Objects::nonNull).peek(i -> logger.info("getGroupIdNamesMapping: {}",i)).collect(Collectors.toMap(i -> i.split(STRING_SEPARATOR)[0], i -> i.split(STRING_SEPARATOR)[1]));
     }
 
     private boolean loginFacebookWeb() throws InterruptedException {
@@ -314,7 +329,6 @@ public abstract class FacebookCommonUtils extends SocialParentCommonUtils {
             driver.findElement(By.xpath("//div[@aria-label='Cancel']//parent::div//preceding-sibling::div//child::div[@aria-label='Delete']")).click();
             Thread.sleep((long) (Math.random() * 2000 + 3000));
         }
-        ;
         deletePendingPostsByGroupId(groupId);
     }
 

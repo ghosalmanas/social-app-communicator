@@ -25,7 +25,6 @@ import org.springframework.stereotype.Component;
 
 import java.awt.*;
 import java.io.IOException;
-import java.text.MessageFormat;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -380,7 +379,15 @@ public abstract class SocialParentCommonUtils extends Constants {
                     continue;
                 }
 
-                if (!webElements.isEmpty()) {
+                if(webElements.isEmpty()){
+                    if(retryCount==MAX_RETRIES){
+                        throw new RuntimeException("Severe concern: No elements found for xPath to click at final retries: " + currentXPath);
+                    }
+                    logger.error("No elements found for xPath: " + currentXPath);
+                    retryCount++;
+                    continue;
+
+                } else {
                     if (clickOnAllIfMultiplesFound) {
                         webElements.forEach(webElement -> {
                             try {
@@ -398,6 +405,8 @@ public abstract class SocialParentCommonUtils extends Constants {
                         return true;
                     }
                 }
+
+
 
             } catch (ElementClickInterceptedException ex) {
                 logger.warn("Element click intercepted, retrying...");
@@ -441,7 +450,7 @@ public abstract class SocialParentCommonUtils extends Constants {
 
                 // Try to find elements
                 List<WebElement> webElements = febxs(currentXPath);
-                
+
                 // If no elements found and alternate path provided, switch to alternate
                 if (webElements.isEmpty() && xPathAlternate != null && !xPathAlternate.isEmpty() && retryCount == 0) {
                     currentXPath = xPathAlternate;
@@ -469,13 +478,16 @@ public abstract class SocialParentCommonUtils extends Constants {
                 }
 
             } catch (ElementClickInterceptedException ex) {
-                logger.warn("Element click intercepted, retrying...");
-                actionsKeyPerform(Keys.ESCAPE);
+                logger.warn("Element click intercepted, trying remove any blocker popup or alert...",ex);
+                removePopUpLikePrivateGroupBlockingClick();
+
             } catch (WebDriverException e) {
                 logger.warn("WebDriverException occurred: " + e.getMessage());
                 ensureWindowFocused();
             } catch (Exception ex) {
                 logger.error("Unexpected error in febxsAndClick", ex);
+            } finally {
+                logger.info("Finally block reached, no action taken");
             }
 
             retryCount++;
@@ -491,6 +503,20 @@ public abstract class SocialParentCommonUtils extends Constants {
 
         logger.error("Failed to complete febxsAndClick after {} attempts for xPath: {}", MAX_RETRIES, currentXPath);
         return false;
+    }
+
+    public void removePopUpLikePrivateGroupBlockingClick() {
+        logger.warn("It Seems a blocking popup finding message but not send button. Element click intercepted, retrying...");
+        actionsKeyPerform(Keys.ENTER);//for Ok
+        actionsKeyPerform(Keys.ESCAPE);//worked for private group popup
+        if(!febxsAndClick("//*[text()='OK' or text()='Ok']", null, true, "OK")) {
+            if(!febxsAndClick("//*[text()='CANCEL or text()='Cancel']", null, true, "Cancel")) {
+                boolean okCancelCloseWorked = febxsAndClick("//*[text()='CLOSE' or text()='Close']", null, true, "Close");
+                if(!okCancelCloseWorked) {
+                    logger.error("OK, Cancel, or Close not found after clicking Enter and escape");
+                }
+            }
+        }
     }
 
 

@@ -83,6 +83,7 @@ public class Telegram_Xpaths implements XPathInterfaceWATG {
 
     private final String SPAN_DATA_TESTID_SEND = "//button[@title='Send Message']";
     private final String DIV_TITLE_TYPE_A_MESSAGE = "//div[@aria-label='Message']";
+    private final String FIND_MESSAGE_TEXT_NOT_ALLOWED_IN_POST_BOX = "//*[contains(text(),'Text not allowed') or contains(text(),'The admins of this group have restricted your ability to send messages.') or text()='Message for ' or text()='This channel is private']";
     //"//div[@id='message-input-text']//child::div//child::span[text()='Message']";
 
     private final String LABEL_MAGNIFYING_GLASS_SEARCH_BUTTON_XPATH = "//input[@id='telegram-search-input' and @placeholder='Search']";
@@ -148,7 +149,7 @@ public class Telegram_Xpaths implements XPathInterfaceWATG {
                     + " _NL_ "
                     + "**Technology Stacks** :"
                     + " _NL_ "
-                    + "  1. **JAVA 8,11,17,21 and Complex Codings**"
+                    + "  1. **JAVA 8,11,17,21,24 and Complex Codings and LeetCode problem solving**"
                     + " _NL_ "
                     + "  2. Spring, Spring Boot, Spring MVC, Spring AI"
                     + " _NL_ "
@@ -437,5 +438,10 @@ public class Telegram_Xpaths implements XPathInterfaceWATG {
     @Override
     public String getSOCIAL_MEDIA_SCANNER_IDENTIFIER_AFTER_URL() {
         return TELEGRAM_SCANNER_IDENTIFIER;
+    }
+
+    @Override
+    public String getFIND_MESSAGE_TEXT_NOT_ALLOWED_IN_POST_BOX() {
+        return FIND_MESSAGE_TEXT_NOT_ALLOWED_IN_POST_BOX;
     }
 }

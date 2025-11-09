@@ -1,7 +1,5 @@
 package com.wtf.app.model.xpaths;
 
-import com.wtf.app.model.enums.SocialType;
-
 import java.util.function.Predicate;
 
 public interface XPathInterfaceWATG extends XPathInterface {
@@ -98,4 +96,5 @@ public interface XPathInterfaceWATG extends XPathInterface {
 
 	String getLEFT_PANEL_CHAT_LIST_WITH_CUSTOM_SCROLL_TO_SCROLL_DOWN();
 
+	String getFIND_MESSAGE_TEXT_NOT_ALLOWED_IN_POST_BOX();
 }

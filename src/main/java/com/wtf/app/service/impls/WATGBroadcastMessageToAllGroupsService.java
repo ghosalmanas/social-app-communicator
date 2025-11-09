@@ -214,7 +214,14 @@ public class WATGBroadcastMessageToAllGroupsService extends WATGParent implement
 
             Thread.sleep(getSLEEP_TIME_MS() * 2);
 
-            febxsAndClickWithRetry(getxPathInterface().getSPAN_DATA_TESTID_SEND(), "",true,"Clicking Send Button");
+            boolean isSendButtonAvailableAndClicked = febxsAndClickWithRetry(getxPathInterface().getSPAN_DATA_TESTID_SEND(), "",true,"Clicking Send Button");
+            if(!isSendButtonAvailableAndClicked){
+                logger.error("Send Button is not available or not clicked for the for the taskType :{} Executing OK or CANCEL to avoid private group or PayStar or upcoming popups", instance.getTaskType());
+                removePopUpLikePrivateGroupBlockingClick();
+                isSendButtonAvailableAndClicked = febxsAndClickWithRetry(getxPathInterface().getSPAN_DATA_TESTID_SEND(), "",true,"Clicking Send Button");
+                logger.info("Message Broadcast Succeeded Now? {}.............for TaskType: {}",isSendButtonAvailableAndClicked, instance.getTaskType());
+                return;
+            }
             Thread.sleep(getSLEEP_TIME_MS());
             logger.info("Message Broadcasted Successfully............. TaskType: {}", instance.getTaskType());
         } catch (Exception e) {

@@ -16,6 +16,7 @@ import org.openqa.selenium.interactions.MoveTargetOutOfBoundsException;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.awt.*;
@@ -42,6 +43,8 @@ public abstract class WATGParent extends WATGCommonUtils {
     private final ThreadLocal<Set<String>> alreadyTraversedGroupsOnlyThreadLocal = ThreadLocal.withInitial(HashSet::new);
     private final ThreadLocal<Set<String>> alreadyTraversedGroupsAndIndividualsThreadLocal = ThreadLocal.withInitial(TreeSet::new);
 
+    @Value("${wa.waitForLoadingAllChatsForGroupJoiningDuringTraversal:false}")
+    private boolean shouldWaitForLoadingInWhatsapp;
     /**
      * Gets the WebDriver instance for the current thread, creating it if necessary.
      *
@@ -324,7 +327,7 @@ public abstract class WATGParent extends WATGCommonUtils {
                 Set<String> setOfDataToExport = new LinkedHashSet<>();
 
 
-                boolean waitForLoadingAllChatsForGroupJoiningDuringTraversal = Boolean.parseBoolean(properties.getProperty("wa.waitForLoadingAllChatsForGroupJoiningDuringTraversal", "false"));
+                boolean waitForLoadingAllChatsForGroupJoiningDuringTraversal = shouldWaitForLoadingInWhatsapp;//Boolean.parseBoolean(properties.getProperty("wa.waitForLoadingAllChatsForGroupJoiningDuringTraversal", "false"));
                 String filePathToExportContactsData = instance.getFilePathToExportContactsData();
                 Tika tika = new Tika();
 
@@ -782,7 +785,7 @@ public abstract class WATGParent extends WATGCommonUtils {
             /* Allow admins for WA for Contact extractions.. Write all Use cases for clarity and avoid blocking any use case*/
             /*
              * Use Cases:
-             * 1.Message Posting: Allow Only Groups. Not admins, Subscribers and individual users
+             * 1.Message Posting: Allow Only Groups. Not admins, Subscribers, MessageNotAllowed and individual users
              * 2.Traverse and contacts extractions and join new groups: Allow Groups, admins and subscribers as well. Not user.
              * 3.Archive: Allow Groups and Admins for WA
              * 4.UnArchieve: All
@@ -804,11 +807,14 @@ public abstract class WATGParent extends WATGCommonUtils {
             boolean isItsAnAdminGroup = !febxs(
                     getxPathInterface().getFIND_ADMIN_GROUP_NAME_RIGHT_TOP()).isEmpty();//All for WA but only members and Subscribers for TG, not user
 
+            //Exceptional ad-hoc cases where it says members but message is not allowed : Not required as of now as the impact is exception in the log only
+            /*boolean isMessageTextNotAllowedInPostBox = !febxs(
+                    getxPathInterface().getFIND_MESSAGE_TEXT_NOT_ALLOWED_IN_POST_BOX()).isEmpty();*/
+
             //check if a group with subscribers in TG
             if (!subHeaderToDecideAGroups.isEmpty()) {
                 perfectGroupName = subHeaderToDecideAGroups.getFirst().getText();
             }
-
 
             //Cover the explicit cases first like user and then admin and return.
 

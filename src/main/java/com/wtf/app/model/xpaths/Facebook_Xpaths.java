@@ -38,7 +38,7 @@ public class Facebook_Xpaths implements XPathInterfaceFB {
                     //+ (Keys.SHIFT) + (Keys.ENTER)
                     + "*Technology Stacks* :"
                     + " _NL_ "
-                    + "  1. *JAVA 8,11,17,21 and Complex Codings*"
+                    + "  1. *JAVA 8,11,17,21,24 and Complex Codings and LeetCode problem solving*"
                     + " _NL_ "
                     + "  2. Spring, Spring Boot, Spring MVC, Spring AI"
                     + " _NL_ "
@@ -81,7 +81,7 @@ public class Facebook_Xpaths implements XPathInterfaceFB {
      * +
      * " (Amazon web Service EC2, S3, Route 53, Kinesis, ECS, EKS, *Lambda*, RDS, SQS, SNS, SES)"
      * + " and in Various Technologies"
-     */;
+     */
 
     // + "** Support Process: Two Supports are allocated for a single consultant for
     // Delivery Assurance";
