@@ -59,6 +59,9 @@ public class ParallelWebDriverManager {
     @Value("${webdriver.profile.persist:false}")
     private boolean persistProfiles;
 
+    @Value("${webdriver.fb.profile:Default}")
+    private String fbProfileName;
+
     @Value("${webdriver.max.inactive.minutes:30}")
     private int maxInactiveMinutes;
 
@@ -604,55 +607,65 @@ public class ParallelWebDriverManager {
     
     private WebDriver createWebDriver(String profileName) {
         logger.info("Creating new WebDriver instance for profile: {}", profileName);
-        
+
         try {
             // Configure Chrome options
             ChromeOptions options = getHumanLikeOptions();
-            
-            // Set up profile directory
-            File profileDir = new File(profileBaseDir, profileName);
-            if (!profileDir.exists() && !profileDir.mkdirs()) {
-                throw new RuntimeException("Failed to create profile directory: " + profileDir.getAbsolutePath());
+
+            // Determine profile directory based on profile persistence setting
+            if (persistProfiles && profileBaseDir.contains("User Data")) {
+                // Using existing Chrome user data directory - use it directly
+                logger.info("Using existing Chrome user data directory: {}", profileBaseDir);
+                options.addArguments("--user-data-dir=" + profileBaseDir);
+                // Use the configured Facebook profile name for Facebook tasks, Default for others
+                String profileDirName = profileName.startsWith("FACEBOOK_") ? fbProfileName : "Default";
+                logger.info("Using profile directory: {}", profileDirName);
+                options.addArguments("--profile-directory=" + profileDirName);
+            } else {
+                // Creating new profile directory under base directory
+                File profileDir = new File(profileBaseDir, profileName);
+                if (!profileDir.exists() && !profileDir.mkdirs()) {
+                    throw new RuntimeException("Failed to create profile directory: " + profileDir.getAbsolutePath());
+                }
+                logger.info("Creating new profile directory: {}", profileDir.getAbsolutePath());
+                options.addArguments("--user-data-dir=" + profileDir.getAbsolutePath());
+                options.addArguments("--profile-directory=Default");
             }
-            
-            // Add profile directory to Chrome options
-            options.addArguments("--user-data-dir=" + profileDir.getAbsolutePath());
-            options.addArguments("--profile-directory=Default");
-            
+
             // Additional Chrome options
             options.addArguments("--no-sandbox");
             options.addArguments("--disable-dev-shm-usage");
             options.addArguments("--remote-allow-origins=*");
             options.addArguments("--disable-blink-features=AutomationControlled");
-            
+
             // Set up ChromeDriver service
             ChromeDriverService service = new ChromeDriverService.Builder()
                 .withLogLevel(ChromiumDriverLogLevel.INFO)
                 .build();
-            
+
             // Create and return the WebDriver instance
             WebDriver driver = new ChromeDriver(service, options);
-            
+
             // Configure timeouts
             driver.manage().timeouts()
                 .pageLoadTimeout(Duration.ofSeconds(pageLoadTimeout))
                 .implicitlyWait(Duration.ofSeconds(implicitWait));
-            
+
             logger.info("Successfully created WebDriver for profile: {}", profileName);
             return driver;
-            
+
         } catch (Exception e) {
             logger.error("Failed to create WebDriver for profile: {}", profileName, e);
-            
+
             // Log additional diagnostic information
             logger.error("Chrome version: {}", chromeVersion);
-            logger.error("Profile directory: {}", new File(profileBaseDir, profileName).getAbsolutePath());
+            logger.error("Profile base directory: {}", profileBaseDir);
             logger.error("Headless mode: {}", headless);
             logger.error("Page load timeout: {}s, Implicit wait: {}s", pageLoadTimeout, implicitWait);
-            
+
             // Clean up any partially created resources
             cleanupChromeProcesses();
-            
+
             throw new RuntimeException("Failed to create WebDriver: " + e.getMessage(), e);
         }
     }
@@ -934,7 +947,7 @@ public class ParallelWebDriverManager {
             // Set Chrome version if specified
             if (chromeVersion != null && !chromeVersion.trim().isEmpty() && !"latest".equalsIgnoreCase(chromeVersion)) {
                 try {
-                    WebDriverManager.chromedriver().browserVersion(chromeVersion).setup();
+                    WebDriverManager.chromedriver().browserVersion(chromeVersion).proxy("myproxy:8080").timeout(50).setup();
                     logger.info("Using Chrome version: {}", chromeVersion);
                 } catch (Exception e) {
                     logger.warn("Failed to set Chrome version to {}: {}", chromeVersion, e.getMessage());

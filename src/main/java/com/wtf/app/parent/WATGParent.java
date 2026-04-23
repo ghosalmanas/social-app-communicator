@@ -437,6 +437,7 @@ public abstract class WATGParent extends WATGCommonUtils {
 
                             } else {
                                 //runRobotClassForNextChat();
+                                logger.info("runActionClassForNextCha......");
                                 runActionClassForNextChat();
                             }
                         }

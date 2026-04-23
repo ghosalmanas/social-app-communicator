@@ -258,22 +258,84 @@ public abstract class FacebookCommonUtils extends SocialParentCommonUtils {
     private boolean loginFacebookWeb() throws InterruptedException {
 
         try {
-            WebElement emailElement = getDriver().findElement(By.xpath("//*[@id='email']"));
-            emailElement.sendKeys(xPathInterfaceFB.getEmail());
-            Thread.sleep(2);
-            WebElement passElement = driver.findElement(By.xpath("//*[@id='pass']"));
-            passElement.sendKeys(xPathInterfaceFB.getPassword());
-            Thread.sleep(2);
+            // Check if already logged in by looking for logged-in indicators
+            if (isAlreadyLoggedIn()) {
+                logger.info("Already logged into Facebook, skipping automated login");
+                return true;
+            }
+                logger.info("Not logged in, avoiding automated login");
+                //loginToFacebook();
 
-            WebElement loginElement = driver.findElement(By.xpath("//button[@name='login' and @type='submit']"));
-            loginElement.click();
-
-            Thread.sleep(5000);
+            //loginToFacebook();
         } catch (Exception e) {
             logger.error("Exception occurred while login into facebook", e);
             return false;
         }
-        return true;
+        return false;//true;
+    }
+
+    private void loginToFacebook() throws InterruptedException {
+        logger.info("Not logged in, attempting automated login");
+        Thread.sleep(10000);//remove
+        WebElement emailElement = getDriver().findElement(By.xpath("//*[@name='email']"));
+        emailElement.sendKeys(xPathInterfaceFB.getEmail());
+        Thread.sleep(2);
+        WebElement passElement = driver.findElement(By.xpath("//*[@name='pass']"));
+        passElement.sendKeys(xPathInterfaceFB.getPassword());
+        Thread.sleep(2);
+
+        Thread.sleep(10000);//remove
+        WebElement loginElement = driver.findElement(By.xpath("//div[@aria-label='Log in' and @role='button']"));
+        loginElement.click();
+
+        Thread.sleep(5000);
+    }
+
+    private boolean isAlreadyLoggedIn() {
+        try {
+            // Check for logged-in indicators
+            // Look for elements that only appear when logged in
+            String currentUrl = driver.getCurrentUrl();
+            logger.info("Current URL: {}", currentUrl);
+
+            // If URL contains home.php or is facebook.com without login form, likely logged in
+            if (currentUrl.contains("facebook.com/home") || currentUrl.contains("facebook.com/?")) {
+                return true;
+            }
+
+            // Check for search bar (only appears when logged in)
+            try {
+                driver.findElement(By.xpath("//input[@placeholder='Search Facebook']"));
+                logger.info("Found search bar - user is logged in");
+                return true;
+            } catch (Exception e) {
+                // Search bar not found, might not be logged in
+            }
+
+            // Check for menu bar (only appears when logged in)
+            try {
+                driver.findElement(By.xpath("//div[@aria-label='Facebook']"));
+                logger.info("Found Facebook menu bar - user is logged in");
+                return true;
+            } catch (Exception e) {
+                // Menu bar not found
+            }
+
+            // Check if login form is NOT present
+            try {
+                driver.findElement(By.xpath("//*[@name='email']"));
+                logger.info("Login form found - user is NOT logged in");
+                return false;
+            } catch (Exception e) {
+                // Login form not found, might be logged in
+                logger.info("Login form not found - assuming user is logged in");
+                return true;
+            }
+
+        } catch (Exception e) {
+            logger.error("Error checking login status, assuming not logged in", e);
+            return false;
+        }
     }
 
     /* Not in Use Directly*/
@@ -381,7 +443,7 @@ public abstract class FacebookCommonUtils extends SocialParentCommonUtils {
         }
 
         Thread.sleep(4000);
-        postBox = driver.findElement(By.xpath("//div[contains(@aria-label,'Submit an anonymous post')]"));
+        postBox = driver.findElement(By.xpath("//div[contains(@aria-placeholder,'Submit an anonymous post...')]"));
         return postBox;
     }
 
@@ -424,6 +486,24 @@ public abstract class FacebookCommonUtils extends SocialParentCommonUtils {
         driver.findElement(By.xpath("//span[text()='Post']//parent::span//parent::div//parent::div//parent::div//parent::div")).click();
     }
 
+    protected void attachAdvertisingImage() throws InterruptedException {
+        //div[@aria-label="Photo/video" and @role = 'button']
+        WebElement attachBtn = driver.findElement(By.xpath("//input[@type='file']"));
+        if(attachBtn==null) {
+            attachBtn = driver.findElement(By.cssSelector("input[type='file']"));
+            if(attachBtn==null){
+                // Click the Photo/Video button to make the input appear
+                driver.findElement(By.xpath("//div[@aria-label='Photo/video']")).click();
+                attachBtn = driver.findElement(By.cssSelector("input[type='file']"));
+            }
+        }
+        if(attachBtn==null) {
+            logger.info("Attach Button not found");
+            return;
+        }
+        attachBtn.sendKeys("D:\\Eclipse-workspace\\WA_TG_FB_SeleniumFreelancerAppV2\\image\\CorporateStyleBlueAdvertise.PNG");
+        Thread.sleep(5000);
+    }
 
     public Set<String> clearUpdateCurrDateAndReloadFile(String fileNameWithExtension, String messageFormatInsideFile, Set<String> groupsAlreadyMessageSentForTheDaySet, boolean clearExistingContent) {
         Set<String> finalGroupsAlreadyMessageSentForTheDaySet = groupsAlreadyMessageSentForTheDaySet;

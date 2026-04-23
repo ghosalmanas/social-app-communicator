@@ -43,6 +43,10 @@ public class FacebookBroadcastSelfSkillSetService extends FacebookBroadcastParen
     @Value("${wantToAddMillisAtMessageEndToMakeEachMessageUnique:false}")
     private boolean wantToAddMillisAtMessageEndToMakeEachMessageUnique;
 
+
+    @Value("${wantToAttachAdvertisingImage:false}")
+    private boolean wantToAttachAdvertisingImage;
+
     @Autowired
     public FacebookBroadcastSelfSkillSetService(XPathInterfaceFB xPathInterfaceFB,
                                               @Lazy 
@@ -78,9 +82,14 @@ public class FacebookBroadcastSelfSkillSetService extends FacebookBroadcastParen
             if (!isMessagePretendingHumanTypingSuccess) {
                 logger.error("Pretend human typing failed for groupId {}, so sending directly : ", groupId);
             }
+
+            if(wantToAttachAdvertisingImage){
+                attachAdvertisingImage();
+            }
+
             postTheMessageToSubmitInFB();
 
-            scrollAndSleepRandomly(10000, 7000);
+            scrollAndSleepRandomly(20000, 7000);
 
             if (isPendingPostsPresent(groupId)) {
                 logger.info(MSG_POST_STAGES_LOG._4_MSG_POST_PENDING + " : " + "Ohh! Still Pending Post created after Posting the new Message for groupId : " + groupId + " index:"

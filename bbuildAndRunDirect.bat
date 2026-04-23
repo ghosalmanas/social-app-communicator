@@ -2,7 +2,7 @@ call taskkill /F /IM java.exe >nul 2>&1
 call taskkill /F /IM chrome.exe /T
 call taskkill /F /IM chromedriver.exe /T
 call taskkill /F /IM Rambox.exe /T
-start "SunAweray" /min "C:\Program Files\Aweray\AweSun\AweSun.exe"
+rem "SunAweray" /min "C:\Program Files\Aweray\AweSun\AweSun.exe"
 rem ghosalmanas80@gmail.com
 timeout /t 10
 

@@ -28,12 +28,50 @@ public class BrowserLauncher {
     
     @EventListener(ApplicationReadyEvent.class)
     public void onApplicationReady(ApplicationReadyEvent event) {
+        // Skip browser launch during tests
+        if (isTestEnvironment(event)) {
+            logger.info("Test environment detected, skipping browser launch");
+            return;
+        }
+
         // Only one thread will be able to execute this block at a time
         synchronized (lock) {
             // Double-check pattern to ensure thread safety
             if (browserLaunched.compareAndSet(false, true)) {
                 launchBrowser();
             }
+        }
+    }
+
+    private boolean isTestEnvironment(ApplicationReadyEvent event) {
+        // Check for test profile
+        String[] activeProfiles = event.getApplicationContext().getEnvironment().getActiveProfiles();
+        for (String profile : activeProfiles) {
+            if ("test".equalsIgnoreCase(profile)) {
+                return true;
+            }
+        }
+
+        // Check for Spring Boot test system property
+        String isTest = System.getProperty("spring-boot.test");
+        if (isTest != null && isTest.equalsIgnoreCase("true")) {
+            return true;
+        }
+
+        // Check for JUnit test
+        if (isRunningUnderJUnit()) {
+            return true;
+        }
+
+        return false;
+    }
+
+    private boolean isRunningUnderJUnit() {
+        try {
+            Class.forName("org.junit.jupiter.api.Test");
+            return true;
+        } catch (ClassNotFoundException e) {
+            return false;
         }
     }
     

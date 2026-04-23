@@ -8,6 +8,7 @@ logs/
 chromedriver/
 tools/
 /dbfiles/
+*.log
 
 ### STS ###
 .apt_generated

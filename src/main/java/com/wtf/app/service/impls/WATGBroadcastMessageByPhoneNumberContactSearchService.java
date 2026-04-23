@@ -68,7 +68,7 @@ public class WATGBroadcastMessageByPhoneNumberContactSearchService extends WATGP
                     + " _NL_ "
                     + "*>* JAVA 8,11,17,21, Spring Boot, Spring AI, Microservices, Kafka, Angular, React, Javascript, AWS, Docker, Kubernetes, Redis*, JPA, Data Structures and Algorithms "
                     + " _NL_ "
-                    + "*>* Process: - *Prompting & Transcript with Premium Otter* with Screen Control for live coding.";
+                    + "*>* Process: - *Prompting & Transcript with Pro Premium Otter* with Pro Premium Screen Control for live coding.";
 
 
     @Autowired

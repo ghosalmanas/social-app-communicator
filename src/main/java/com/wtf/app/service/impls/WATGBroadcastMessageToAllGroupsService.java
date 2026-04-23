@@ -152,6 +152,7 @@ public class WATGBroadcastMessageToAllGroupsService extends WATGParent implement
                 // Navigate to WhatsApp Web and register with health monitor
                 webDriverHealthService.updateActivityTime(taskType);
                 Thread.sleep(200);
+                logger.info("about to broadcast message to group");
                 // Broadcast to Group
                 broadcastMessageToSupportGroups();
                 checkPendingAndErrorStatus(groupNameExceptIndv, counter, 0);
@@ -186,23 +187,10 @@ public class WATGBroadcastMessageToAllGroupsService extends WATGParent implement
             if(wantToAddMillisAtMessageEndToMakeEachMessageUnique) {
                 message = message + appendCurrentDateTimeToMessage();
             }
+            logger.info("wantToClearIfDraftedBeforeSend : " + wantToClearIfDraftedBeforeSend);
 
             if(wantToClearIfDraftedBeforeSend) {
-                try {
-                    webElementTypeMsg.clear();
-                    logger.info("Cleared the message box");
-                }catch (Exception e) {
-                    logger.error("Failed to clear the message box ",e);
-                    logger.info("trying to clear the message box using keyboard using ctrl + a and backspace");
-                    try{
-                        Actions action = new Actions(ThreadLocalAutomationContext.getContext().getDriver());
-                        action.keyDown(Keys.CONTROL).sendKeys("a").keyUp(Keys.CONTROL).perform();
-                        action.keyDown(Keys.BACK_SPACE).perform();
-                        action.release();
-                    }catch (Exception ex) {
-                        logger.error("Failed to clear the message box using keyboard using ctrl + a and backspace",ex);
-                    }
-                }
+                clearTheDraftCreatedByAlertPopup(webElementTypeMsg);
             }
             Thread.sleep(200);
             //webElementTypeMsg.sendKeys(message);
@@ -214,9 +202,20 @@ public class WATGBroadcastMessageToAllGroupsService extends WATGParent implement
 
             Thread.sleep(getSLEEP_TIME_MS() * 2);
 
+            try{
+                pressEnterToSend(webElementTypeMsg);
+                logger.info("Message Broadcasted Successfully by simply pressing enter instead of pressing Send button............. TaskType: {}", instance.getTaskType());
+                return;
+            }catch(Exception e){
+                logger.error("Failed to send message by sendKeys ENTER",e);
+            }
+
             boolean isSendButtonAvailableAndClicked = febxsAndClickWithRetry(getxPathInterface().getSPAN_DATA_TESTID_SEND(), "",true,"Clicking Send Button");
             if(!isSendButtonAvailableAndClicked){
-                logger.error("Send Button is not available or not clicked for the for the taskType :{} Executing OK or CANCEL to avoid private group or PayStar or upcoming popups", instance.getTaskType());
+                logger.info("Send Button is not available due to private group or PayStar or upcoming popups alerts for taskType :{}", instance.getTaskType());
+                pressEnterToSend(webElementTypeMsg);
+
+                logger.error("TaskType :{} Executing OK or CANCEL to avoid private group or PayStar or upcoming popups", instance.getTaskType());
                 removePopUpLikePrivateGroupBlockingClick();
                 isSendButtonAvailableAndClicked = febxsAndClickWithRetry(getxPathInterface().getSPAN_DATA_TESTID_SEND(), "",true,"Clicking Send Button");
                 logger.info("Message Broadcast Succeeded Now? {}.............for TaskType: {}",isSendButtonAvailableAndClicked, instance.getTaskType());
@@ -226,6 +225,50 @@ public class WATGBroadcastMessageToAllGroupsService extends WATGParent implement
             logger.info("Message Broadcasted Successfully............. TaskType: {}", instance.getTaskType());
         } catch (Exception e) {
             logger.error("Error during message broadcast :", e);
+        }
+    }
+
+    private void pressEnterToSend(WebElement webElementTypeMsg) throws InterruptedException {
+        logger.info("Clicking Enter With Actions to send the message for taskType :{}", instance.getTaskType());
+        Actions action = new Actions(ThreadLocalAutomationContext.getContext().getDriver());
+        action.keyDown(Keys.ENTER).perform();
+        action.release();
+        Thread.sleep(getSLEEP_TIME_MS());
+        logger.info("Clicking Enter With sendKeys to send the message for taskType :{}", instance.getTaskType());
+        webElementTypeMsg.sendKeys(Keys.ENTER);
+        Thread.sleep(getSLEEP_TIME_MS());
+    }
+
+    private static void clearTheDraftCreatedByAlertPopup(WebElement webElementTypeMsg) {
+        try {
+            if(webElementTypeMsg.getText()!=null && !webElementTypeMsg.getText().isEmpty()){
+                webElementTypeMsg.click();
+                Thread.sleep(200);
+                webElementTypeMsg.sendKeys(Keys.chord(Keys.CONTROL, "a"));
+                Thread.sleep(200);
+                webElementTypeMsg.sendKeys(Keys.BACK_SPACE);
+                Thread.sleep(200);
+                logger.info("Cleared the message box by CTRL+A and BACKSPACE");
+                webElementTypeMsg.clear();
+                Thread.sleep(200);
+                logger.info("Cleared the message box by clear method");
+            }else{
+                logger.info("Message box is empty. Lets add our message");
+            }
+
+        }catch (Exception e) {
+            logger.error("Failed to clear the message box ",e);
+            logger.info("trying to clear the message box using keyboard using ctrl + a and backspace");
+            try{
+                Actions action = new Actions(ThreadLocalAutomationContext.getContext().getDriver());
+                action.keyDown(Keys.CONTROL).sendKeys("a").keyUp(Keys.CONTROL).perform();
+                action.keyDown(Keys.BACK_SPACE).perform();
+                action.release();
+                Thread.sleep(200);
+                logger.info("Cleared the message box by keyboard using ctrl + a and backspace");
+            }catch (Exception ex) {
+                logger.error("Failed to clear the message box using keyboard using ctrl + a and backspace",ex);
+            }
         }
     }
 

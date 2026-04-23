@@ -8,6 +8,7 @@ import com.wtf.app.model.dto.SocialModel;
 import com.wtf.app.model.enums.TaskType;
 import com.wtf.app.service.impls.FacebookBroadcastForOffSuppAnnonymService;
 import com.wtf.app.service.impls.starter.service.whatsApp.SocialMediaParentRunner;
+import com.wtf.app.util.ThreadLocalAutomationContext;
 import com.wtf.app.web.driver.ParallelWebDriverManager;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -52,12 +53,19 @@ public class FacebookBroadcastGreetOffFreelancerInFBGroupsStarter extends Social
         this.fbCBroadcastForOffSuppAnnonymService = fbCBroadcastForOffSuppAnnonymService;
     }
 
+
     @Override
     public void traverseGroupsTemplate(SocialParentCommonUtils instance) throws InterruptedException, AWTException, IOException {
         logger.info("Starting to traverse Facebook groups for greeting off-freelancers");
         Assert.notNull(fbCBroadcastForOffSuppAnnonymService, "fbCBroadcastForOffSuppAnnonymService must not be null");
 
         try {
+            // Get the current context
+            AutomationContext context = ThreadLocalAutomationContext.getContext();
+            if (context == null) {
+                throw new IllegalStateException("AutomationContext is not set in ThreadLocal");
+            }
+
             // Call the service method
             fbCBroadcastForOffSuppAnnonymService.traverseGroups();
             logger.info("Successfully completed greeting off-freelancers in Facebook groups");
@@ -67,14 +75,19 @@ public class FacebookBroadcastGreetOffFreelancerInFBGroupsStarter extends Social
         }
     }
 
+
     @Async
     @Override
     public CompletableFuture<Boolean> start(AutomationContext context) {
         logger.info("Starting Facebook greeting off-freelancers in groups");
         try {
+            // Set the context in ThreadLocalAutomationContext
+            ThreadLocalAutomationContext.setContext(context);
+
             // Validate required dependencies
             Assert.notNull(socialMediaParentRunner, "socialMediaParentRunner must not be null");
             Assert.notNull(facebookDTO, "facebookDTO must not be null");
+            context.setSocialModel(facebookDTO);
 
             // Execute the service using the parent class method
             socialMediaParentRunner.execute(context, this, facebookDTO, TaskType.FACEBOOK_BROADCAST_AD);
@@ -85,6 +98,9 @@ public class FacebookBroadcastGreetOffFreelancerInFBGroupsStarter extends Social
         } catch (Exception e) {
             logger.error("Error in greeting off-freelancers in Facebook groups: {}", e.getMessage(), e);
             return CompletableFuture.failedFuture(new RuntimeException("Error in greeting off-freelancers in Facebook groups", e));
+        } finally {
+            // Clean up the context
+            ThreadLocalAutomationContext.clear();
         }
     }
 }

@@ -438,14 +438,14 @@ public abstract class SocialParentCommonUtils extends Constants {
      * Finds elements by XPath and clicks on them with retry logic
      */
     protected boolean febxsAndClickWithRetry(String xPath, String xPathAlternate, boolean clickOnAllIfMultiplesFound, String callerBasicInformation) {
-        final int MAX_RETRIES = 3;
+        final int MAX_RETRIES = 1;
         int retryCount = 0;
         String currentXPath = xPath;
 
         while (retryCount < MAX_RETRIES) {
             try {
                 ensureWindowFocused();
-                logger.info("febxsAndClick attempt {} - xPath: {}, alternate: {}, caller: {}", 
+                logger.info("febxsAndClickWithRetry attempt {} - xPath: {}, alternate: {}, caller: {}",
                     retryCount + 1, currentXPath, xPathAlternate, callerBasicInformation);
 
                 // Try to find elements
@@ -455,6 +455,7 @@ public abstract class SocialParentCommonUtils extends Constants {
                 if (webElements.isEmpty() && xPathAlternate != null && !xPathAlternate.isEmpty() && retryCount == 0) {
                     currentXPath = xPathAlternate;
                     logger.info("Switching to alternate xPath: " + currentXPath);
+                    retryCount++;
                     continue;
                 }
 
@@ -501,7 +502,7 @@ public abstract class SocialParentCommonUtils extends Constants {
             }
         }
 
-        logger.error("Failed to complete febxsAndClick after {} attempts for xPath: {}", MAX_RETRIES, currentXPath);
+        logger.error("Failed to complete febxsAndClickWithRetry after {} attempts for xPath: {}", MAX_RETRIES, currentXPath);
         return false;
     }
 
@@ -510,7 +511,7 @@ public abstract class SocialParentCommonUtils extends Constants {
         actionsKeyPerform(Keys.ENTER);//for Ok
         actionsKeyPerform(Keys.ESCAPE);//worked for private group popup
         if(!febxsAndClick("//*[text()='OK' or text()='Ok']", null, true, "OK")) {
-            if(!febxsAndClick("//*[text()='CANCEL or text()='Cancel']", null, true, "Cancel")) {
+            if(!febxsAndClick("//*[text()='CANCEL' or text()='Cancel']", null, true, "Cancel")) {
                 boolean okCancelCloseWorked = febxsAndClick("//*[text()='CLOSE' or text()='Close']", null, true, "Close");
                 if(!okCancelCloseWorked) {
                     logger.error("OK, Cancel, or Close not found after clicking Enter and escape");

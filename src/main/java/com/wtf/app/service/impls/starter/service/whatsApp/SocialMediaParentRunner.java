@@ -19,13 +19,11 @@ public class SocialMediaParentRunner {
     private static final Logger logger = LogManager.getLogger(SocialMediaParentRunner.class);
 
     public boolean execute(AutomationContext context, SocialParentCommonUtils instance, SocialModel socialModel, TaskType taskType) throws InterruptedException, AWTException, IOException {
-        if (instance instanceof WATGCommonUtils) {
-        }
 
         instance.setSocialModel(socialModel);
         instance.setxPathInterface(socialModel.getxPathInterface());
         instance.setBaseUrl(socialModel.getBaseURL());
-        instance.setTaskTypeMapping(taskType, (WATGCommonUtils) instance);
+        instance.setTaskTypeMapping(taskType, instance);
         logger.info("socialType : " + socialModel.getSocialType() + "...baseURL : "+ socialModel.getBaseURL()+" taskType : "+taskType+" instance : "+instance);
 
         instance.traverseGroupsTemplate(instance);

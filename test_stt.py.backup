@@ -1,0 +1,14 @@
+from RealtimeSTT import AudioToTextRecorder
+import requests
+
+# Initialize RealtimeSTT
+stt = AudioToTextRecorder(model="medium", language="en")
+
+def handle_text(text):
+    print("Transcript:", text)
+    # Example: send to an AI endpoint (pseudo-code)
+    response = requests.post("https://api.copilot.microsoft.com/query", json={"input": text})
+    print("AI Response:", response.json())
+
+# Start transcription with callback
+stt.start(callback=handle_text)

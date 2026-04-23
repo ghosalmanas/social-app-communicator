@@ -11,7 +11,7 @@ public class ChromeTest {
             System.out.println("Setting up ChromeDriver...");
 
             // This will automatically download and setup ChromeDriver
-            WebDriverManager.chromedriver().setup();
+            WebDriverManager.chromedriver().timeout(50).setup();
 
             // Optional: Configure Chrome options
             ChromeOptions options = new ChromeOptions();

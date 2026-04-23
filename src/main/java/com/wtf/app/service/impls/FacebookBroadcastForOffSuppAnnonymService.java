@@ -59,7 +59,7 @@ public class FacebookBroadcastForOffSuppAnnonymService extends FacebookBroadcast
 			}
 
 			Thread.sleep(4000);
-			WebElement postBox = driver.findElement(By.xpath("//div[text()='Submit an anonymous post']"));
+			WebElement postBox = driver.findElement(By.xpath("//div[contains(@aria-placeholder,'Submit an anonymous post...')]"));
 
 			Thread.sleep(4000);
 			postBox.sendKeys(message);

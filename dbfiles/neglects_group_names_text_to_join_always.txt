@@ -4,6 +4,8 @@ Stock
 Invest
 trade
 trading
+signal
+pay
 market
 capital
 gain
@@ -19,6 +21,7 @@ coin
 benefit
 Account
 FOREX
+bitcoin
 payment
 flash
 card
@@ -60,3 +63,6 @@ king
 prediction
 LOAN
 LOANS
+transfer
+money
+play

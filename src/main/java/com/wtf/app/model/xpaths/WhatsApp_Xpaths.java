@@ -17,11 +17,11 @@ public class WhatsApp_Xpaths implements XPathInterfaceWATG {
             //""+(Keys.SHIFT)+(Keys.ENTER)+(Keys.SHIFT)+
             /*" _NL_ "*/
 
-            "I am a *Fullstack Proxy and Support individual direct Person with 16+ Years of Expertise IT Industry Experience*. WhatsApp: *+918274848227*"
+            "I am a *Fullstack, DevOps and Data Engineer Proxy and Support individual direct Person with 16+ Years of Expertise IT Industry Experience*. WhatsApp: *+918274848227*"
                     + " _NL_ "
                     + " _NL_ "
                     //+ "and 7+ Years Experience in Interview Support and Job Support."
-                    + "*100% GUARANTEED, SAFE AND SECURE*, I take calls from _*USA, Canada, UK and India since last 9+ years*_ in Fullstack and Backend profiles in below areas:"
+                    + "*100% GUARANTEED, SAFE AND SECURE*, I take calls from _*USA, Canada, UK and India since last 9+ years*_ in Fullstack, DevOps, Data Engineer and Backend profiles especially for **FAANG and MNCs** in below areas:"
                     //+(Keys.SHIFT)+(Keys.ENTER)+(Keys.SHIFT)
                     + " _NL_ "
                     //+ "*>* Call/Message me directly (*Direct Contact*) for any *Fullstack or Backend requirements* on - "
@@ -41,7 +41,7 @@ public class WhatsApp_Xpaths implements XPathInterfaceWATG {
                     //+(Keys.SHIFT)+(Keys.ENTER)+(Keys.SHIFT)+
                     + "*Technology Stacks* :"
                     + " _NL_ "
-                    + "  1. *JAVA 8,11,17,21,24 and Complex Codings and _*LeetCode*_ problem solving*"
+                    + "  1. *JAVA 8,11,17,21,24, Python, C# and Complex Codings and LeetCode problem solving*"
                     + " _NL_ "
                     + "  2. Spring, Spring Boot, Spring MVC, Spring AI"
                     + " _NL_ "
@@ -49,20 +49,22 @@ public class WhatsApp_Xpaths implements XPathInterfaceWATG {
                     + " _NL_ "
                     + "  4. *Angular, React, Javascript*"
                     + " _NL_ "
-                    + "  5. Kafka, Spark"
+                    + "  5. Apache/Confluent Kafka, Apache Spark, Hadoop, Desk, Data Lake, Snow Flake, ETL"
                     + " _NL_ "
-                    + "  6. *AWS*/Azure/GCP"
+                    + "  6. AWS/Azure/GCP, DevOps, CICD, Selenium, Cucumber, Automation, PowerBI, Salesforce & Appian"
                     + " _NL_ "
                     + "  7. Docker, Kubernetes, Redis, JPA, SQL and NoSQL Databases"
                     + " _NL_ "
-                    + "  8. *Data Structures and Algorithms*"
+                    + "  8. AI/ML, MLOps, Bedrock, GenAI, FM, LLM, PyTorch, Vector Database"
+                    + " _NL_ "
+                    + "  9. *Data Structures and Algorithms*"
                     //+ "for - *INTERVIEW SUPPORT (PROXY Call)*/ Assignment/ *Job Support/ Coding Test*/ Training/ Tasks"
                     //+(Keys.SHIFT)+(Keys.ENTER)+(Keys.SHIFT)
                     //+(Keys.SHIFT)+(Keys.ENTER)+(Keys.SHIFT)
                     + " _NL_ "
                     //+ "*>* I am a *Professional Direct Proxy* and I do *Prompting and with Premium Otter or Google Transcript * wth Screen Control for coding."
                     //+ "*>* Besides, I'm a *Professional Java Fullstack Proxy*"
-                    + "*Process*: - Prompting & Transcript with *Otter Premium* with *100% _IN-VISIBLE and UN-TRACEABLE_ Screen Control app* for live coding."
+                    + "*Process*: - Prompting & Transcript with *Otter Pro Premium* with *100% _IN-VISIBLE and UN-TRACEABLE_ Pro Premium Screen Control app* for live coding."
                     + " _NL_ "
                     +" WhatsApp: *+918274848227*";
     //+(Keys.SHIFT)+(Keys.ENTER)+(Keys.SHIFT)
@@ -127,7 +129,7 @@ public class WhatsApp_Xpaths implements XPathInterfaceWATG {
     private final String XPATH_SEARCH = "//*[@aria-label='Search input textbox']";
     //"//*[@id=\"side\"]/div[1]/div/div/div[2]/div/div[1]/p";
     private final String SELECT_FIRST_RESULT_FROM_SEARCH_OF_PREVIOUS_GROUP = "//span[contains(@title,'%s')]";
-    private final String CLEAR_SEARCH_OF_PREVIOUS_GROUP_AFTER_SELECTION = "//button[@aria-label=‘Cancel search’]";
+    private final String CLEAR_SEARCH_OF_PREVIOUS_GROUP_AFTER_SELECTION = "//button[@aria-label='Cancel search']";
             //"//span[@data-icon='close-refreshed']";
     private final String XPATH_GROUP_CONTACTS_MOUSEHOVER = "//*[@id=\"main\"]/header/div[2]/div[2]/span";
     private final String CHROME_DRIVE_PATH = "D:\\SupportDetails\\Support_ExtractSupportProxyContacts\\chromedriver_win64\\chromedriver.exe";
@@ -157,8 +159,8 @@ public class WhatsApp_Xpaths implements XPathInterfaceWATG {
     private final int MOVE_TO_CHAT_VK_CONTROL = KeyEvent.VK_CONTROL;
     private final int MOVE_TO_CHAT_VK_ALT = KeyEvent.VK_ALT;
 
-    private final CharSequence MOVE_TO_NEXT_CHAT_KEYS = "]";
-    private final CharSequence MOVE_TO_PREVIOUS_CHAT_KEYS = "[";
+    private final CharSequence MOVE_TO_NEXT_CHAT_KEYS = Keys.TAB;
+    private final CharSequence MOVE_TO_PREVIOUS_CHAT_KEYS = Keys.TAB;
     private final CharSequence MOVE_TO_CHAT_KEYS_SHIFT = Keys.SHIFT;
     private final CharSequence MOVE_TO_CHAT_KEYS_CONTROL = Keys.CONTROL;
     private final CharSequence MOVE_TO_CHAT_KEYS_ALT = Keys.ALT;
