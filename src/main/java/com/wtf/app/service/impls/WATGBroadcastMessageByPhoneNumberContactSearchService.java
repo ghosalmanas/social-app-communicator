@@ -128,14 +128,14 @@ public class WATGBroadcastMessageByPhoneNumberContactSearchService extends WATGP
 
                     if(wantToSendMessageToIndianConsultants) {
                         Set<String> knownClientConsultantNamesInd = new TreeSet<>(WhatsappDBFileRepository
-                                .getAllGroupsFromCsv(Paths.get("known_client_consultant_names_IND.txt")));
+                                .getAllGroupsFromCsv(Paths.get("dbfiles/master_fixed_files/known_client_consultant_names_IND.txt")));
                         consultantContactsToSendMessageIndividually.addAll(knownClientConsultantNamesInd);
                         logger.info( "knownClientConsultantNamesInd size :" + knownClientConsultantNamesInd.size());
                     }
 
                     if(wantToSendMessageToUSAConsultants) {
                         Set<String> knownClientConsultantNamesUSA = new TreeSet<>(WhatsappDBFileRepository
-                                .getAllGroupsFromCsv(Paths.get("known_client_consultant_names_USA.txt")));
+                                .getAllGroupsFromCsv(Paths.get("dbfiles/master_fixed_files/known_client_consultant_names_USA.txt")));
                         consultantContactsToSendMessageIndividually.addAll(knownClientConsultantNamesUSA);
                         logger.info("knownClientConsultantNamesUSA size :" + knownClientConsultantNamesUSA.size());
                     }
@@ -148,7 +148,7 @@ public class WATGBroadcastMessageByPhoneNumberContactSearchService extends WATGP
 
                     if(wantToSendMessageToUSAConsultantsItsSevereAndRisky) {
                         Set<String> UNKNOWN_client_consultant_names_USA = new TreeSet<>(WhatsappDBFileRepository
-                                .getAllGroupsFromCsv(Paths.get("Unknown_client_consultant_names_USA.txt")));
+                                .getAllGroupsFromCsv(Paths.get("dbfiles/master_fixed_files/Unknown_client_consultant_names_USA.txt")));
                         //allPhNumsFromCsvFromEachPersonMessage.addAll(UNKNOWN_client_consultant_names_USA); unknown should be handled separately replacing 9007765487(login) by 8274848227(login)
                         logger.info("Unknown_client_consultant_names_USA size :" + UNKNOWN_client_consultant_names_USA.size());
                     }

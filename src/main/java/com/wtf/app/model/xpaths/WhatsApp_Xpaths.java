@@ -420,4 +420,20 @@ public class WhatsApp_Xpaths implements XPathInterfaceWATG {
     public String getFIND_MESSAGE_TEXT_NOT_ALLOWED_IN_POST_BOX() {
         return FIND_MESSAGE_TEXT_NOT_ALLOWED_IN_POST_BOX;
     }
+
+    @Override
+    public String getXPATH_SEARCH_EXTRACT_LOOKING_FOR() {
+        return "";
+    }
+
+
+    @Override
+    public String getXPATH_SEARCH_EXTRACT_MESSAGE_ELEMENTS() {
+        return "";
+    }
+
+    @Override
+    public String getXPATH_SEARCH_RESULT_BY_CONTACT_NAME() {
+        return "";
+    }
 }

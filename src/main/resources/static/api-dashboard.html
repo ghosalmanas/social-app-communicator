@@ -78,6 +78,11 @@
     <div class="controller">
         <h2>Common Controller</h2>
         <div class="endpoint">
+            <a href="#" onclick="return callEndpoint('/social-app/automation/start', 'POST')" class="method-post">POST /social-app/automation/start</a>
+            <div class="description">Start all enabled automations in parallel</div>
+            <div class="response" id="common-automation-start"></div>
+        </div>
+        <div class="endpoint">
             <a href="#" onclick="return callEndpoint('/social-app/test', 'GET')" class="method-get">GET /social-app/test</a>
             <div class="response" id="common-test"></div>
         </div>

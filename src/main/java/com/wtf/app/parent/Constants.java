@@ -74,16 +74,16 @@ public abstract class Constants {
     protected static String ALL_SUPPORT_GROUPS = DB_FILES+"successfulGroups.txt";
     protected Set<String> allSuccessfulSupportGroupsFromFile = extractListOfDataFromFile(ALL_SUPPORT_GROUPS);
 
-    protected String EXCLUDE_PERSONAL_GROUP_NAMES_FROM_CSV = DB_FILES+"exclude_personal_group_names_always.txt";
+    protected String EXCLUDE_PERSONAL_GROUP_NAMES_FROM_CSV = DB_FILES+"master_fixed_files/exclude_personal_group_names_always.txt";
     protected final Set<String> excludePersonalGroupNamesSet = extractListOfDataFromFile(EXCLUDE_PERSONAL_GROUP_NAMES_FROM_CSV);
 
-    protected String EXCLUDE_SUPPORT_GROUP_NAMES_FROM_CSV = DB_FILES+"exclude_group_support_names_always.txt";
+    protected String EXCLUDE_SUPPORT_GROUP_NAMES_FROM_CSV = DB_FILES+"master_fixed_files/exclude_group_support_names_always.txt";
     protected final Set<String> excludeSupportGroupNamesSet = extractListOfDataFromFile(EXCLUDE_SUPPORT_GROUP_NAMES_FROM_CSV);
 
-    protected String EXCLUDE_PERSONAL_GROUP_CONTACT_NAMES_FROM_CSV = DB_FILES+"exclude_group_contact_names_always_for_the_day.txt";//to avoid newly added/created personal group or newly joined members
+    protected String EXCLUDE_PERSONAL_GROUP_CONTACT_NAMES_FROM_CSV = DB_FILES+"master_fixed_files/exclude_group_contact_names_always_for_the_day.txt";//to avoid newly added/created personal group or newly joined members
     protected Set<String> excludePersonalGroupContactNamesOrNumbersSet = extractListOfDataFromFile(EXCLUDE_PERSONAL_GROUP_CONTACT_NAMES_FROM_CSV);
 
-    protected static String NEGLECT_TO_JOIN_GROUPS_WITH_TEXT = DB_FILES+"neglects_group_names_text_to_join_always.txt";
+    protected static String NEGLECT_TO_JOIN_GROUPS_WITH_TEXT = DB_FILES+"master_fixed_files/neglects_group_names_text_to_join_always.txt";
     private static Set<String> neglectToJoinGroupsWithTextSet = extractListOfDataFromFile(NEGLECT_TO_JOIN_GROUPS_WITH_TEXT);
     protected final Set<String> neglectToJoinGroupsWithTextSetLowerCase = neglectToJoinGroupsWithTextSet.parallelStream()
             .map(String::toLowerCase)
@@ -127,13 +127,13 @@ public abstract class Constants {
 
 
     /* for Facebook */
-    private static final String BROADCAST_GROUP_ID_NAMES_FB = DB_FILES+"fb_group_id_name_mapping_support_proxy.txt";
+    private static final String BROADCAST_GROUP_ID_NAMES_FB = DB_FILES+"master_fixed_files/fb_group_id_name_mapping_support_proxy.txt";
     protected static Set<String> broadcastGroupIdNameFBSet = extractListOfDataFromFile(BROADCAST_GROUP_ID_NAMES_FB);
 
     private static final String BROADCAST_GROUP_ID_PENDING_POST_PILED_GROUPS_FB = DB_FILES+"fb_groups_pending_posts_message_piled.txt";
     protected static Set<String> pendingPostPiledGroupsFB_set = extractListOfDataFromFile(BROADCAST_GROUP_ID_PENDING_POST_PILED_GROUPS_FB);
 
-    private static final String BROADCAST_SENSITIVE_GROUP_ID_NAMES_FB = DB_FILES+"fb_sensitive_group_id_name_mapping_training.txt";
+    private static final String BROADCAST_SENSITIVE_GROUP_ID_NAMES_FB = DB_FILES+"master_fixed_files/fb_sensitive_group_id_name_mapping_training.txt";
     protected static Set<String> broadcastSensitiveGroupIdNameFBSet = extractListOfDataFromFile(BROADCAST_SENSITIVE_GROUP_ID_NAMES_FB);
 
     protected static final String GROUPS_ALREADY_MESSAGE_SENT_FOR_THE_DAY_TXT_FB = DB_FILES+"fb_groups_already_message_sent_forTheDay.txt";

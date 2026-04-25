@@ -6,10 +6,17 @@ import java.util.List;
 
 // Spring imports
 import com.wtf.app.model.enums.SocialType;
+import com.wtf.app.model.dto.AutomationContext;
+import com.wtf.app.model.enums.TaskType;
+import com.wtf.app.service.ParallelAutomationService;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -28,16 +35,39 @@ public class CommonController {
 
     private final ApplicationContext applicationContext;
     private final InitialSetup initialSetup;
-    
+    private final ParallelAutomationService parallelAutomationService;
 
+    @Autowired
     public CommonController(ApplicationContext applicationContext, 
-                          InitialSetup initialSetup) {
+                          InitialSetup initialSetup,
+                          ParallelAutomationService parallelAutomationService) {
         this.applicationContext = applicationContext;
         this.initialSetup = initialSetup;
+        this.parallelAutomationService = parallelAutomationService;
         
         logger.info("CommonController initialized with RequestContext");
         // Call test API on initialization
         testApiEasily();
+    }
+
+    /**
+     * Start all enabled automations in parallel.
+     * Copied from AutomationController for easy access at top of CommonController.
+     */
+    @PostMapping("/automation/start")
+    public ResponseEntity<String> startAllAutomations() {
+        try {
+            TaskType whatsappFetchContacts = TaskType.WHATSAPP_FETCH_CONTACTS;
+            AutomationContext context = new AutomationContext(whatsappFetchContacts);
+            logger.info("Kicking off all automations with context ID: {}", context.getTaskId());
+
+            parallelAutomationService.startAllAutomations(context, List.of(whatsappFetchContacts, TaskType.TELEGRAM_FETCH_CONTACTS, TaskType.WHATSAPP_BROADCAST_AD_TO_GROUPS, TaskType.TELEGRAM_BROADCAST_AD, TaskType.FACEBOOK_BROADCAST_AD, TaskType.FACEBOOK_BROADCAST_SENSITIVE_AD, TaskType.TELEGRAM_SEARCH_LOOKING_FOR, TaskType.WHATSAPP_SEARCH_LOOKING_FOR));
+
+            return ResponseEntity.ok("All automation tasks started successfully.");
+        } catch (Exception e) {
+            logger.error("Failed to start automations", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to start automations: " + e.getMessage());
+        }
     }
 
     @GetMapping("/test")

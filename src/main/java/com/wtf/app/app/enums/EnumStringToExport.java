@@ -1,5 +1,0 @@
-package com.wtf.app.app.enums;
-
-public enum EnumStringToExport {
-	NEW_PH_CONTACTS, SUCCESSFUL_GROUP_NAMES, MESSAGE_SENT_GROUP_NAMES_FOR_THE_DAY, ERROR_GROUP_NAMES, SET_OF_DATA, DEFAULT
-}

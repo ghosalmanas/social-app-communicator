@@ -3,6 +3,7 @@ package com.wtf.app.controller;
 import com.wtf.app.commons.InitialSetup;
 import com.wtf.app.model.enums.TaskType;
 import com.wtf.app.service.impls.starter.service.whatsApp.*;
+import org.springframework.beans.factory.annotation.Value;
 import com.wtf.app.service.impls.WATGBroadcastMessageToAllGroupsService;
 import com.wtf.app.service.interfaces.IAllWAGroupNamesRetrievalAndJoinNewGroups;
 import org.apache.logging.log4j.LogManager;
@@ -31,17 +32,21 @@ public class WhatsappController {
 
     private final WhatsappFetchAllWAContactsGroupNamesJoinLinksStarter whatsappFetchAllWAContactsGroupNamesJoinLinksStarter;
     private final WhatsappBroadcastSelfSkillsToWAGroupsStarter whatsappBroadcastSelfSkillsToWAGroupsStarter;
+    private final WhatsAppSearchAndExtractLookingForStarter whatsappSearchAndExtractLookingForStarter;
     /*private final WhatsappBroadcastReqsToOffSuppMembersStarter.WhatsappBroadcastSelfSkillsToKnownConsultantClients_from9007Only_sendAt8pmStarter whatsappBroadcastSelfSkillsToKnownConsultantClients_from9007Only_sendAt8pmStarter;
     private final WhatsappBroadcastSelfSkillsToUnknownConsultantClientsStarter whatsappBroadcastSelfSkillsToUnknownConsultantClientsStarter;*/
     private final IAllWAGroupNamesRetrievalAndJoinNewGroups watgFetchAllWAContactsWGroupNamesService;
     private final WATGBroadcastMessageToAllGroupsService watgBroadcastMessageToAllGroupsService;
     private final ApplicationContext applicationContext;
     private final InitialSetup initialSetup;
-    
+
+    @Value("${whatsapp.search.looking.for.enabled:false}")
+    private boolean whatsappSearchLookingForEnabled;
 
     @Autowired
     public WhatsappController(WhatsappFetchAllWAContactsGroupNamesJoinLinksStarter whatsappFetchAllWAContactsGroupNamesJoinLinksStarter,
-                            WhatsappBroadcastSelfSkillsToWAGroupsStarter whatsappBroadcastSelfSkillsToWAGroupsStarter,/*
+                            WhatsappBroadcastSelfSkillsToWAGroupsStarter whatsappBroadcastSelfSkillsToWAGroupsStarter,
+                            WhatsAppSearchAndExtractLookingForStarter whatsappSearchAndExtractLookingForStarter,/*
                             WhatsappBroadcastReqsToOffSuppMembersStarter.WhatsappBroadcastSelfSkillsToKnownConsultantClients_from9007Only_sendAt8pmStarter whatsappBroadcastSelfSkillsToKnownConsultantClients_from9007Only_sendAt8pmStarter,
                             WhatsappBroadcastSelfSkillsToUnknownConsultantClientsStarter whatsappBroadcastSelfSkillsToUnknownConsultantClientsStarter,*/
 
@@ -53,6 +58,7 @@ public class WhatsappController {
                             InitialSetup initialSetup) {
         this.whatsappFetchAllWAContactsGroupNamesJoinLinksStarter = whatsappFetchAllWAContactsGroupNamesJoinLinksStarter;
         this.whatsappBroadcastSelfSkillsToWAGroupsStarter = whatsappBroadcastSelfSkillsToWAGroupsStarter;
+        this.whatsappSearchAndExtractLookingForStarter = whatsappSearchAndExtractLookingForStarter;
         /*this.whatsappBroadcastSelfSkillsToKnownConsultantClients_from9007Only_sendAt8pmStarter = whatsappBroadcastSelfSkillsToKnownConsultantClients_from9007Only_sendAt8pmStarter;
         this.whatsappBroadcastSelfSkillsToUnknownConsultantClientsStarter = whatsappBroadcastSelfSkillsToUnknownConsultantClientsStarter;*/
         this.watgFetchAllWAContactsWGroupNamesService = watgFetchAllWAContactsWGroupNamesService;
@@ -146,6 +152,37 @@ public class WhatsappController {
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             logger.error("Error during WA broadcast to unknown clients", e);
+            response.put("status", "ERROR");
+            response.put("error", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
+
+    @GetMapping("/search-looking-for")
+    public ResponseEntity<Map<String, Object>> startSearchAndExtractLookingFor() {
+        logger.info("Starting WA search and extract 'I am looking for' messages");
+        Map<String, Object> response = new HashMap<>();
+        response.put("timestamp", LocalDateTime.now());
+        response.put("endpoint", "/search-looking-for");
+        
+        // Check if the feature is enabled
+        if (!whatsappSearchLookingForEnabled) {
+            logger.warn("WhatsApp search and extract 'I am looking for' is disabled in application.properties");
+            response.put("status", "DISABLED");
+            response.put("message", "Feature is disabled. Set whatsapp.search.looking.for.enabled=true in application.properties to enable.");
+            return ResponseEntity.ok(response);
+        }
+        
+        try {
+            // Execute the operation
+            AutomationContext context = new AutomationContext(TaskType.WHATSAPP_SEARCH_LOOKING_FOR);
+            whatsappSearchAndExtractLookingForStarter.start(context);
+            
+            logger.info("Successfully completed WA search and extract 'I am looking for' messages");
+            response.put("status", "COMPLETED");
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            logger.error("Error during WA search and extract 'I am looking for' messages", e);
             response.put("status", "ERROR");
             response.put("error", e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);

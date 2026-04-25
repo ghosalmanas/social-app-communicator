@@ -128,6 +128,11 @@ public class Telegram_Xpaths implements XPathInterfaceWATG {
     private final CharSequence MOVE_TO_CHAT_KEYS_ALT = Keys.ALT;
 
 
+    // Search and extract specific XPaths for contact selection and message extraction
+    private final String XPATH_SEARCH_RESULT_BY_CONTACT_NAME = "//*[contains(@class, 'chat-list')]//h3[contains(text(), '%s')]/ancestor::div[@class='info']/preceding-sibling::div[contains(@class,'ripple-container')]";
+    private final String XPATH_SEARCH_EXTRACT_MESSAGE_ELEMENTS = "//div[@class='ListItem-button']/descendant::div[@class='message']";
+    private final String XPATH_SEARCH_EXTRACT_LOOKING_FOR = "//div[@class='ListItem-button']//div[@class='message' and contains(text(),'I am looking for')]";
+
     private final String MESSAGE_TO_EACH_GROUP_TO_ADVERTISE_FOR_SELF_SKILLSET_FOR_PROXY_SUPPORT =
             //""+(Keys.SHIFT)+(Keys.ENTER)+(Keys.SHIFT)+
             "I am a **Fullstack, DevOps and Backend Proxy and Support** direct individual Person with 16+ Years of **Expertise IT Industry Experience**. WhatsApp: **+918274848227**"
@@ -446,5 +451,20 @@ public class Telegram_Xpaths implements XPathInterfaceWATG {
     @Override
     public String getFIND_MESSAGE_TEXT_NOT_ALLOWED_IN_POST_BOX() {
         return FIND_MESSAGE_TEXT_NOT_ALLOWED_IN_POST_BOX;
+    }
+
+    @Override
+    public String getXPATH_SEARCH_RESULT_BY_CONTACT_NAME() {
+        return XPATH_SEARCH_RESULT_BY_CONTACT_NAME;
+    }
+
+    @Override
+    public String getXPATH_SEARCH_EXTRACT_MESSAGE_ELEMENTS() {
+        return XPATH_SEARCH_EXTRACT_MESSAGE_ELEMENTS;
+    }
+
+    @Override
+    public String getXPATH_SEARCH_EXTRACT_LOOKING_FOR() {
+        return XPATH_SEARCH_EXTRACT_LOOKING_FOR;
     }
 }

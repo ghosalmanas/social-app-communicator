@@ -39,7 +39,7 @@ public class AutomationController {
             AutomationContext context = new AutomationContext(whatsappFetchContacts); // Or a more generic type
             logger.info("Kicking off all automations with context ID: {}", context.getTaskId());
 
-            parallelAutomationService.startAllAutomations(context, List.of(whatsappFetchContacts, TaskType.TELEGRAM_FETCH_CONTACTS, TaskType.WHATSAPP_BROADCAST_AD_TO_GROUPS, TaskType.TELEGRAM_BROADCAST_AD, TaskType.FACEBOOK_BROADCAST_AD,TaskType.FACEBOOK_BROADCAST_SENSITIVE_AD));
+            parallelAutomationService.startAllAutomations(context, List.of(whatsappFetchContacts, TaskType.TELEGRAM_FETCH_CONTACTS, TaskType.WHATSAPP_BROADCAST_AD_TO_GROUPS, TaskType.TELEGRAM_BROADCAST_AD, TaskType.FACEBOOK_BROADCAST_AD, TaskType.FACEBOOK_BROADCAST_SENSITIVE_AD, TaskType.TELEGRAM_SEARCH_LOOKING_FOR, TaskType.WHATSAPP_SEARCH_LOOKING_FOR));
 
             return ResponseEntity.ok("All automation tasks started successfully.");
         } catch (Exception e) {

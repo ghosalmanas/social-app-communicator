@@ -104,6 +104,12 @@ public class ParallelWebDriverManager {
     @Value("${webdriver.chrome.args:}")
     private String[] chromeArgs;
     
+    @Value("${selenium.chrome.extension.path:}")
+    private String chromeExtensionPath;
+    
+    @Value("${selenium.chrome.extension.required:false}")
+    private boolean chromeExtensionRequired;
+    
     @Value("${webdriver.chrome.experimental.options:{}}")
     private String experimentalOptionsJson = "{}";
     
@@ -512,9 +518,9 @@ public class ParallelWebDriverManager {
 
             WebDriver driver = profileDriverMap.get(profileName);
             if (driver == null || !isSessionActive(driver)) {//REVERT if Required
-                int maxRetries = 1;
+                int maxRetries = 3;
                 int retryCount = 0;
-                long retryDelayMs = 1000; // Start with 1 second delay
+                long retryDelayMs = 2000; // Start with 2 second delay
 
                 while (retryCount < maxRetries) {
                     try {
@@ -859,6 +865,49 @@ public class ParallelWebDriverManager {
     }
 
     /**
+     * Configures Chrome extension loading from CRX file.
+     * @param options ChromeOptions to add extension to
+     */
+    private void configureChromeExtension(ChromeOptions options) {
+        if (chromeExtensionPath == null || chromeExtensionPath.trim().isEmpty()) {
+            return;
+        }
+        
+        // Only load extension if it's required
+        if (!chromeExtensionRequired) {
+            logger.info("Chrome extension loading is disabled (chromeExtensionRequired=false)");
+            return;
+        }
+        
+        try {
+            // Try to load from classpath first
+            java.io.InputStream is = getClass().getClassLoader().getResourceAsStream(chromeExtensionPath);
+            if (is != null) {
+                java.nio.file.Path tempDir = java.nio.file.Files.createTempDirectory("chrome-ext-");
+                java.nio.file.Path tempFile = tempDir.resolve("extension.crx");
+                java.nio.file.Files.copy(is, tempFile, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                is.close();
+                options.addExtensions(tempFile.toFile());
+                logger.info("Loaded Chrome extension from classpath: {}", chromeExtensionPath);
+            } else {
+                // Try to load from file system
+                File extensionFile = new File(chromeExtensionPath);
+                if (extensionFile.exists() && extensionFile.canRead()) {
+                    options.addExtensions(extensionFile);
+                    logger.info("Loaded Chrome extension from file: {}", chromeExtensionPath);
+                } else {
+                    throw new IllegalStateException("Required Chrome extension not found: " + chromeExtensionPath);
+                }
+            }
+        } catch (Exception e) {
+            logger.warn("Failed to load Chrome extension: {}", e.getMessage());
+            if (chromeExtensionRequired) {
+                throw new RuntimeException("Failed to load required Chrome extension", e);
+            }
+        }
+    }
+
+    /**
      * Creates ChromeOptions with settings that make the browser appear more like a human user.
      * Includes various optimizations for stability and automation detection avoidance.
      * @return Configured ChromeOptions instance
@@ -908,7 +957,6 @@ public class ParallelWebDriverManager {
                 "--no-sandbox",
                 "--disable-dev-shm-usage",
                 "--disable-gpu",
-                "--disable-extensions",
                 "--disable-infobars",
                 "--disable-notifications",
                 "--disable-blink-features=AutomationControlled",
@@ -922,8 +970,19 @@ public class ParallelWebDriverManager {
                 "--ignore-certificate-errors",
                 "--safebrowsing-disable-download-protection",
                 "--safebrowsing-disable-extension-blacklist",
-                "--start-maximized"
+                "--start-maximized",
+                "--disable-renderer-backgrounding",
+                "--disable-backgrounding-occluded-windows",
+                "--disable-background-networking",
+                "--no-first-run",
+                "--no-default-browser-check",
+                "--disable-ipc-flooding-protection"
             ));
+            
+            // Only add --disable-extensions if no extension is configured
+            if (chromeExtensionPath == null || chromeExtensionPath.trim().isEmpty()) {
+                args.add("--disable-extensions");
+            }
             
             // Add user agent to mimic a real browser
             String userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
@@ -931,6 +990,9 @@ public class ParallelWebDriverManager {
             
             // Add all arguments to Chrome options
             options.addArguments(args);
+            
+            // Add Chrome extension if configured
+            configureChromeExtension(options);
             
             // Set Chrome binary path if specified
             if (chromeBinaryPath != null && !chromeBinaryPath.trim().isEmpty()) {

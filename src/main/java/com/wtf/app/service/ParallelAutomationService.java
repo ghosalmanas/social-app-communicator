@@ -7,6 +7,8 @@ import com.wtf.app.service.impls.FacebookBroadcastSelfSkillSetService;
 import com.wtf.app.service.impls.FacebookBroadcastToSensitiveGroupAnnonymService;
 import com.wtf.app.service.impls.WATGBroadcastMessageToAllGroupsService;
 import com.wtf.app.service.impls.WATGFetchAllWAContactsWGroupNamesService;
+import com.wtf.app.service.impls.starter.service.whatsApp.WhatsAppSearchAndExtractLookingForStarter;
+import com.wtf.app.service.impls.starter.service.zTelegram.TelegramSearchAndExtractLookingForStarter;
 import com.wtf.app.service.parallel.TelegramAutomationService;
 import com.wtf.app.service.parallel.WhatsAppAutomationService;
 import com.wtf.app.util.ThreadLocalAutomationContext;
@@ -15,6 +17,7 @@ import org.apache.logging.log4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Service;
@@ -40,6 +43,8 @@ public class ParallelAutomationService {
     private final WhatsAppAutomationService whatsAppService;
     private final TelegramAutomationService telegramService;
     private final FacebookBroadcastSelfSkillSetService facebookBroadcastSelfSkillSetService;
+    private final TelegramSearchAndExtractLookingForStarter telegramSearchAndExtractLookingForStarter;
+    private final WhatsAppSearchAndExtractLookingForStarter whatsappSearchAndExtractLookingForStarter;
 
     @Autowired
     private FacebookBroadcastToSensitiveGroupAnnonymService facebookBroadcastToSensitiveGroupAnnonymService;
@@ -61,8 +66,14 @@ public class ParallelAutomationService {
     @Value("${whatsapp.fetch.contacts.enabled:false}")
     private boolean whatsappFetchContactsEnabled;
 
+    @Value("${whatsapp.search.looking.for.enabled:false}")
+    private boolean whatsappSearchLookingForEnabled;
+
     @Value("${telegram.fetch.contacts.enabled:false}")
     private boolean telegramFetchContactsEnabled;
+
+    @Value("${telegram.search.looking.for.enabled:false}")
+    private boolean telegramSearchLookingForEnabled;
 
     @Value("${facebook.group.broadcast.enabled:false}")
     private boolean facebookBroadcastEnabled;
@@ -86,7 +97,9 @@ public class ParallelAutomationService {
             @Qualifier("telegramBroadcastService") WATGBroadcastMessageToAllGroupsService telegramBroadcastService,
             WhatsAppAutomationService whatsAppService,
             TelegramAutomationService telegramService,
-            FacebookBroadcastSelfSkillSetService facebookBroadcastSelfSkillSetService) {
+            FacebookBroadcastSelfSkillSetService facebookBroadcastSelfSkillSetService,
+            @Lazy TelegramSearchAndExtractLookingForStarter telegramSearchAndExtractLookingForStarter,
+            @Lazy WhatsAppSearchAndExtractLookingForStarter whatsappSearchAndExtractLookingForStarter) {
         this.taskExecutor = taskExecutor;
         this.whatsAppFetchService = whatsAppFetchService;
         this.telegramFetchService = telegramFetchService;
@@ -95,6 +108,8 @@ public class ParallelAutomationService {
         this.whatsAppService = whatsAppService;
         this.telegramService = telegramService;
         this.facebookBroadcastSelfSkillSetService = facebookBroadcastSelfSkillSetService;
+        this.telegramSearchAndExtractLookingForStarter = telegramSearchAndExtractLookingForStarter;
+        this.whatsappSearchAndExtractLookingForStarter = whatsappSearchAndExtractLookingForStarter;
         logger.info("Initialized ParallelAutomationService with thread pool size: {}-{}",
                 taskExecutor.getCorePoolSize(), taskExecutor.getMaxPoolSize());
     }
@@ -119,6 +134,18 @@ public class ParallelAutomationService {
                     }, taskExecutor)
                     .exceptionally(ex -> {
                         logger.error("WhatsApp fetch contacts failed", ex);
+                        return null; // Mark as complete even on failure
+                    }));
+        }
+
+        if (whatsappSearchLookingForEnabled && taskTypes.contains(TaskType.WHATSAPP_SEARCH_LOOKING_FOR)) {
+            futures.add(CompletableFuture.runAsync(() -> {
+                        TaskType whatsappSearchLookingFor = TaskType.WHATSAPP_SEARCH_LOOKING_FOR;
+                        AutomationContext automationContext = ThreadLocalAutomationContext.createContext(whatsappSearchLookingFor);
+                whatsappSearchAndExtractLookingForStarter.start(automationContext);
+                    }, taskExecutor)
+                    .exceptionally(ex -> {
+                        logger.error("WhatsApp search and extract 'I am looking for' failed", ex);
                         return null; // Mark as complete even on failure
                     }));
         }
@@ -157,6 +184,18 @@ public class ParallelAutomationService {
                     }, taskExecutor)
                     .exceptionally(ex -> {
                         logger.error("Telegram broadcast failed", ex);
+                        return null; // Mark as complete even on failure
+                    }));
+        }
+
+        if (telegramSearchLookingForEnabled && taskTypes.contains(TaskType.TELEGRAM_SEARCH_LOOKING_FOR)) {
+            futures.add(CompletableFuture.runAsync(() -> {
+                        TaskType telegramSearchLookingFor = TaskType.TELEGRAM_SEARCH_LOOKING_FOR;
+                        AutomationContext automationContext = ThreadLocalAutomationContext.createContext(telegramSearchLookingFor);
+                telegramSearchAndExtractLookingForStarter.start(automationContext);
+                    }, taskExecutor)
+                    .exceptionally(ex -> {
+                        logger.error("Telegram search and extract 'I am looking for' failed", ex);
                         return null; // Mark as complete even on failure
                     }));
         }
