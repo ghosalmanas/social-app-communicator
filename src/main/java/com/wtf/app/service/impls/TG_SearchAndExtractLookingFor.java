@@ -36,6 +36,18 @@ public class TG_SearchAndExtractLookingFor extends WATGParent {
 
     private static final FlowType enumFlowType = FlowType.SEARCH_AND_EXTRACT_LOOKING_FOR;
 
+    // Constants
+    private static final String DEFAULT_CONTACT_NAME = "@akashvijaykumarfs";
+    private static final String EXTRACTED_MESSAGES_FILE = "dbfiles/telegram_extracted_messages.txt";
+    private static final String SEARCH_PHRASE = "\"I am looking for\"";
+    private static final String NO_NEW_POSTS_MESSAGE = "Telegram: No New Post with 'Looking for Support' Found";
+    private static final int SEARCH_WAIT_MS = 1000;
+    private static final int CONTACT_SELECT_WAIT_MS = 2000;
+    private static final int MESSAGE_SEND_WAIT_MS = 2000;
+    private static final int SCROLL_WAIT_MS = 200;
+    private static final int MAX_NO_NEW_RESULTS = 10;
+    private static final int MAX_SCROLLS = 50;
+
     private final ThreadLocal<Set<String>> extractedMessagesThreadLocal = ThreadLocal.withInitial(LinkedHashSet::new);
 
     @Autowired
@@ -99,137 +111,347 @@ public class TG_SearchAndExtractLookingFor extends WATGParent {
      * @return WebElement for the search input
      */
     private WebElement clearAndSearchInput(WebDriver driver, String searchText) throws InterruptedException {
-        // Click on search button
         driver.findElement(By.xpath(getxPathInterface().getLABEL_MAGNIFYING_GLASS_SEARCH_BUTTON_XPATH())).click();
-        Thread.sleep(1000);
+        Thread.sleep(SEARCH_WAIT_MS);
         
-        // Find search input
         WebElement searchInput = driver.findElement(By.xpath(getxPathInterface().getXPATH_SEARCH()));
         
-        // Clear input multiple times to ensure it's completely empty
         searchInput.clear();
         Thread.sleep(200);
-        searchInput.sendKeys(org.openqa.selenium.Keys.CONTROL + "a"); // Select all
+        searchInput.sendKeys(org.openqa.selenium.Keys.CONTROL + "a");
         Thread.sleep(100);
-        searchInput.sendKeys(Keys.DELETE); // Delete all
+        searchInput.sendKeys(Keys.DELETE);
         Thread.sleep(200);
         searchInput.clear();
         Thread.sleep(300);
         
-        // Type search text
         searchInput.sendKeys(searchText);
-        Thread.sleep(1000); // Wait for search results to load
+        Thread.sleep(SEARCH_WAIT_MS);
         
         return searchInput;
     }
 
     /**
-     * TEMPORARY TEST METHOD: Sends a hardcoded test message to verify sending works.
-     * This method is for testing only and should be removed after verification.
+     * Selects a contact from search results using multiple fallback methods.
      * @param driver WebDriver instance
+     * @param searchInput Search input WebElement
+     * @param contactName Contact name to select
+     * @return true if contact was selected successfully
      */
-    public void testSendHardcodedMessage(WebDriver driver) {
-        String contactName = "@akashvijaykumarfs";
-        String testMessage = "Initiating Search and Extract by Looking For: This is a hardcoded test message to verify sending works.";
-        logger.info("TEST: Sending hardcoded message to contact: {}", contactName);
+    private boolean selectContact(WebDriver driver, WebElement searchInput, String contactName) throws InterruptedException {
+        logger.info("Selecting contact: {}", contactName);
+        boolean contactSelected = false;
         
+        // Method 1: ARROW_DOWN then ENTER
         try {
-            // Clear search input and type contact name
-            WebElement searchInput = clearAndSearchInput(driver, contactName);
+            searchInput.sendKeys(org.openqa.selenium.Keys.ARROW_DOWN, Keys.ENTER);
+            Thread.sleep(500);
+            Thread.sleep(CONTACT_SELECT_WAIT_MS);
             
-            // Select the contact - try multiple methods
-            logger.info("TEST: Selecting contact: {}", contactName);
-            boolean contactSelected = false;
-            
-            // Method 1: ARROW_DOWN twice then ENTER
             try {
-                searchInput.sendKeys(org.openqa.selenium.Keys.ARROW_DOWN, Keys.ENTER);
-                Thread.sleep(500);
-                //searchInput.sendKeys(org.openqa.selenium.Keys.ARROW_DOWN);
-                //Thread.sleep(500);
-                //searchInput.sendKeys(org.openqa.selenium.Keys.ENTER);
-                Thread.sleep(2000);
+                driver.findElement(By.xpath(getxPathInterface().getDIV_TITLE_TYPE_A_MESSAGE()));
+                contactSelected = true;
+                logger.info("Contact selected successfully using ARROW_DOWN method");
+            } catch (Exception e) {
+                logger.warn("Chat did not open with ARROW_DOWN method");
+            }
+        } catch (Exception e) {
+            logger.warn("ARROW_DOWN method failed: {}", e.getMessage());
+        }
+        
+        // Method 2: Click on search result directly
+        if (!contactSelected) {
+            try {
+                String contactNameOnly = contactName.replace("@", "");
+                logger.info("Trying to click on search result directly");
+                WebElement searchResult = driver.findElement(By.xpath(String.format(getxPathInterface().getXPATH_SEARCH_RESULT_BY_CONTACT_NAME(), contactNameOnly)));
+                searchResult.click();
+                Thread.sleep(CONTACT_SELECT_WAIT_MS);
                 
-                // Verify chat opened by checking for message input
                 try {
                     driver.findElement(By.xpath(getxPathInterface().getDIV_TITLE_TYPE_A_MESSAGE()));
                     contactSelected = true;
-                    logger.info("TEST: Contact selected successfully using ARROW_DOWN method");
+                    logger.info("Contact selected successfully using direct click");
                 } catch (Exception e) {
-                    logger.warn("TEST: Chat did not open with ARROW_DOWN method");
+                    logger.warn("Chat did not open with direct click");
                 }
             } catch (Exception e) {
-                logger.warn("TEST: ARROW_DOWN method failed: {}", e.getMessage());
+                logger.warn("Direct click method failed: {}", e.getMessage());
             }
-            
-            // Method 2: Click on search result directly
-            if (!contactSelected) {
-                try {
-                    logger.info("TEST: Trying to click on search result directly");
-                    WebElement searchResult = driver.findElement(By.xpath(String.format(getxPathInterface().getXPATH_SEARCH_RESULT_BY_CONTACT_NAME(), contactName)));
-                    searchResult.click();
-                    Thread.sleep(1000);
-                    
-                    // Verify chat opened
-                    try {
-                        driver.findElement(By.xpath(getxPathInterface().getDIV_TITLE_TYPE_A_MESSAGE()));
-                        contactSelected = true;
-                        logger.info("TEST: Contact selected successfully using direct click");
-                    } catch (Exception e) {
-                        logger.warn("TEST: Chat did not open with direct click");
-                    }
-                } catch (Exception e) {
-                    logger.warn("TEST: Direct click method failed: {}", e.getMessage());
+        }
+        
+        return contactSelected;
+    }
+
+    /**
+     * Attempts to click the send button using multiple XPath fallbacks.
+     * @param driver WebDriver instance
+     * @return true if send button was clicked successfully
+     */
+    private boolean clickSendButton(WebDriver driver) throws InterruptedException {
+        String[] sendButtonXPaths = {
+            getxPathInterface().getSPAN_DATA_TESTID_SEND(),
+            "//button[@title='Send Message']",
+            "//button[@aria-label='Send message']",
+            "//button[contains(@class, 'send')]",
+            "//div[@class='input-field-wrapper']//button",
+            "//button[@data-icon='send']",
+            "//span[@data-icon='send']"
+        };
+        
+        for (String xpath : sendButtonXPaths) {
+            try {
+                WebElement sendButton = driver.findElement(By.xpath(xpath));
+                if (sendButton.isDisplayed() && sendButton.isEnabled()) {
+                    sendButton.click();
+                    Thread.sleep(MESSAGE_SEND_WAIT_MS);
+                    logger.info("Successfully clicked send button using XPath: {}", xpath);
+                    return true;
                 }
+            } catch (Exception e) {
+                logger.debug("Send button not found with XPath: {}", xpath);
             }
+        }
+        
+        logger.warn("Failed to click send button with any XPath");
+        return false;
+    }
+
+    /**
+     * Checks if a message text matches the "looking for" criteria.
+     * @param text Message text to check
+     * @return true if message matches criteria
+     */
+    private boolean isLookingForMessage(String text) {
+        if (text == null || text.trim().isEmpty()) {
+            return false;
+        }
+        
+        String lowerText = text.toLowerCase();
+        boolean hasLookingPhrase = lowerText.contains("i am looking for") || lowerText.contains("we are looking for");
+        boolean hasKeywords = lowerText.contains("support") || lowerText.contains("interview") || lowerText.contains("proxy");
+        
+        return hasLookingPhrase && hasKeywords;
+    }
+
+    /**
+     * Attempts to scroll using multiple fallback methods.
+     * @param driver WebDriver instance
+     * @param searchInput Search input WebElement (for fallback)
+     * @return true if any scroll method succeeded
+     */
+    private boolean scrollWithFallback(WebDriver driver, WebElement searchInput) throws InterruptedException {
+        boolean scrollSuccess = false;
+        
+        // Method 1: Aggressive JavaScript on LeftSearch--content custom-scroll
+        try {
+            WebElement scrollablePanel = findScrollablePanel(driver);
+            if (scrollablePanel == null) throw new Exception("Scrollable panel not found");
+            for (int i = 0; i < 5; i++) {
+                ((org.openqa.selenium.JavascriptExecutor) driver).executeScript("arguments[0].scrollTop = arguments[0].scrollHeight;", scrollablePanel);
+                Thread.sleep(50);
+                ((org.openqa.selenium.JavascriptExecutor) driver).executeScript("arguments[0].scrollBy(0, 3000);", scrollablePanel);
+                Thread.sleep(50);
+            }
+            ((org.openqa.selenium.JavascriptExecutor) driver).executeScript("var event = new WheelEvent('wheel', {deltaY: 1000, bubbles: true}); arguments[0].dispatchEvent(event);", scrollablePanel);
+            Thread.sleep(100);
+            scrollSuccess = true;
+            logger.debug("Scrolled using aggressive JavaScript on LeftSearch--content custom-scroll");
+        } catch (Exception e) {
+            logger.debug("Error scrolling LeftSearch--content with JavaScript: {}", e.getMessage());
+        }
+        
+        // Method 2: Parent element scroll
+        if (!scrollSuccess) {
+            try {
+                WebElement scrollablePanel = findScrollablePanel(driver);
+                if (scrollablePanel == null) throw new Exception("Scrollable panel not found");
+                WebElement parentPanel = scrollablePanel.findElement(By.xpath(".."));
+                ((org.openqa.selenium.JavascriptExecutor) driver).executeScript("arguments[0].scrollTop = arguments[0].scrollHeight;", parentPanel);
+                Thread.sleep(SCROLL_WAIT_MS);
+                scrollSuccess = true;
+                logger.debug("Scrolled using JavaScript on parent of LeftSearch--content");
+            } catch (Exception e) {
+                logger.debug("Error scrolling parent of LeftSearch--content: {}", e.getMessage());
+            }
+        }
+        
+        // Method 3: Actions PAGE_DOWN
+        if (!scrollSuccess) {
+            try {
+                WebElement scrollablePanel = findScrollablePanel(driver);
+                if (scrollablePanel == null) throw new Exception("Scrollable panel not found");
+                org.openqa.selenium.interactions.Actions actions = new org.openqa.selenium.interactions.Actions(driver);
+                actions.moveToElement(scrollablePanel).sendKeys(org.openqa.selenium.Keys.PAGE_DOWN).perform();
+                Thread.sleep(SCROLL_WAIT_MS);
+                scrollSuccess = true;
+                logger.debug("Scrolled using Actions PAGE_DOWN on LeftSearch--content");
+            } catch (Exception e) {
+                logger.debug("Error scrolling LeftSearch--content with Actions: {}", e.getMessage());
+            }
+        }
+        
+        // Method 4: Window scroll
+        if (!scrollSuccess) {
+            try {
+                ((org.openqa.selenium.JavascriptExecutor) driver).executeScript("window.scrollBy(0, 500);");
+                Thread.sleep(SCROLL_WAIT_MS);
+                scrollSuccess = true;
+                logger.debug("Scrolled using window.scrollBy");
+            } catch (Exception e) {
+                logger.debug("Error scrolling window: {}", e.getMessage());
+            }
+        }
+        
+        // Method 5: Document.body scroll
+        if (!scrollSuccess) {
+            try {
+                ((org.openqa.selenium.JavascriptExecutor) driver).executeScript("document.body.scrollTop = document.body.scrollHeight;");
+                Thread.sleep(SCROLL_WAIT_MS);
+                scrollSuccess = true;
+                logger.debug("Scrolled using document.body.scrollTop");
+            } catch (Exception e) {
+                logger.debug("Error scrolling document.body: {}", e.getMessage());
+            }
+        }
+        
+        // Method 6: Mouse wheel simulation
+        if (!scrollSuccess) {
+            try {
+                WebElement scrollablePanel = findScrollablePanel(driver);
+                if (scrollablePanel == null) throw new Exception("Scrollable panel not found");
+                org.openqa.selenium.interactions.Actions actions = new org.openqa.selenium.interactions.Actions(driver);
+                actions.moveToElement(scrollablePanel).click().perform();
+                Thread.sleep(100);
+                for (int i = 0; i < 3; i++) {
+                    actions.sendKeys(org.openqa.selenium.Keys.PAGE_DOWN).perform();
+                    Thread.sleep(100);
+                }
+                scrollSuccess = true;
+                logger.debug("Scrolled using mouse wheel simulation with PAGE_DOWN");
+            } catch (Exception e) {
+                logger.debug("Error scrolling with mouse wheel simulation: {}", e.getMessage());
+            }
+        }
+        
+        // Method 7: Custom-scroll container
+        if (!scrollSuccess) {
+            try {
+                WebElement scrollablePanel = driver.findElement(By.xpath(getxPathInterface().getLEFT_PANEL_CHAT_LIST_WITH_CUSTOM_SCROLL_TO_SCROLL_DOWN()));
+                ((org.openqa.selenium.JavascriptExecutor) driver).executeScript("arguments[0].scrollTop = arguments[0].scrollHeight;", scrollablePanel);
+                Thread.sleep(SCROLL_WAIT_MS);
+                scrollSuccess = true;
+                logger.debug("Scrolled using JavaScript on custom-scroll container");
+            } catch (Exception e) {
+                logger.debug("Error scrolling panel with JavaScript: {}", e.getMessage());
+            }
+        }
+        
+        // Method 8: Inner custom-scroll element
+        if (!scrollSuccess) {
+            try {
+                WebElement scrollablePanel = driver.findElement(By.xpath("//*[contains(@class, 'custom-scroll')]"));
+                ((org.openqa.selenium.JavascriptExecutor) driver).executeScript("arguments[0].scrollTop = arguments[0].scrollHeight;", scrollablePanel);
+                Thread.sleep(SCROLL_WAIT_MS);
+                scrollSuccess = true;
+                logger.debug("Scrolled using JavaScript on inner custom-scroll element");
+            } catch (Exception e) {
+                logger.debug("Error scrolling inner panel with JavaScript: {}", e.getMessage());
+            }
+        }
+        
+        // Method 9: Chat-list element
+        if (!scrollSuccess) {
+            try {
+                WebElement scrollablePanel = driver.findElement(By.xpath("//*[contains(@class, 'chat-list')]"));
+                ((org.openqa.selenium.JavascriptExecutor) driver).executeScript("arguments[0].scrollTop = arguments[0].scrollHeight;", scrollablePanel);
+                Thread.sleep(SCROLL_WAIT_MS);
+                scrollSuccess = true;
+                logger.debug("Scrolled using JavaScript on chat-list element");
+            } catch (Exception e) {
+                logger.debug("Error scrolling chat-list with JavaScript: {}", e.getMessage());
+            }
+        }
+        
+        // Method 10: PAGE_DOWN on scrollable panel
+        if (!scrollSuccess) {
+            try {
+                WebElement scrollablePanel = driver.findElement(By.xpath(getxPathInterface().getLEFT_PANEL_CHAT_LIST_WITH_CUSTOM_SCROLL_TO_SCROLL_DOWN()));
+                scrollablePanel.sendKeys(org.openqa.selenium.Keys.PAGE_DOWN);
+                Thread.sleep(SCROLL_WAIT_MS);
+                scrollSuccess = true;
+                logger.debug("Scrolled using PAGE_DOWN on custom-scroll container");
+            } catch (Exception e) {
+                logger.debug("Error scrolling panel with PAGE_DOWN: {}", e.getMessage());
+            }
+        }
+        
+        // Method 11: Actions class with PAGE_DOWN
+        if (!scrollSuccess) {
+            try {
+                org.openqa.selenium.interactions.Actions actions = new org.openqa.selenium.interactions.Actions(driver);
+                WebElement scrollablePanel = driver.findElement(By.xpath(getxPathInterface().getLEFT_PANEL_CHAT_LIST_WITH_CUSTOM_SCROLL_TO_SCROLL_DOWN()));
+                actions.moveToElement(scrollablePanel).sendKeys(org.openqa.selenium.Keys.PAGE_DOWN).perform();
+                Thread.sleep(SCROLL_WAIT_MS);
+                scrollSuccess = true;
+                logger.debug("Scrolled using Actions class with PAGE_DOWN");
+            } catch (Exception e) {
+                logger.debug("Error scrolling with Actions class: {}", e.getMessage());
+            }
+        }
+        
+        // Method 12: Search input scroll as last resort
+        if (!scrollSuccess) {
+            try {
+                searchInput.sendKeys(org.openqa.selenium.Keys.PAGE_DOWN);
+                Thread.sleep(SCROLL_WAIT_MS);
+                scrollSuccess = true;
+                logger.debug("Scrolled using search input PAGE_DOWN");
+            } catch (Exception e) {
+                logger.debug("Alternative scroll also failed: {}", e.getMessage());
+            }
+        }
+        
+        return scrollSuccess;
+    }
+
+    /**
+     * Sends a startup notification to indicate the service is initializing.
+     * This method provides feedback that the Telegram search and extract service has started.
+     * @param driver WebDriver instance
+     */
+    private void sendStartupNotification(WebDriver driver) {
+        String contactName = DEFAULT_CONTACT_NAME;
+        String startupMessage = String.format(
+            "Telegram Search & Extract Service - Initialization Started for Phrase: 'I am looking for' on 'support', 'interview', or 'proxy' with Timestamp: %s",
+            java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
+        );
+        
+        logger.info("Sending startup notification to contact: {}", contactName);
+        
+        try {
+            WebElement searchInput = clearAndSearchInput(driver, contactName);
             
-            if (!contactSelected) {
-                logger.error("TEST: Could not select contact: {}", contactName);
+            if (!selectContact(driver, searchInput, contactName)) {
+                logger.warn("Could not select contact for startup notification: {}", contactName);
                 return;
             }
             
-            // Find message input
             WebElement messageInput = driver.findElement(By.xpath(getxPathInterface().getDIV_TITLE_TYPE_A_MESSAGE()));
-            
-            // Type the test message
             messageInput.clear();
-            messageInput.sendKeys(testMessage);
+            messageInput.sendKeys(startupMessage);
             Thread.sleep(1000);
             
-            // Click send button
-            boolean sendSuccess = false;
-            String[] sendButtonXPaths = {
-                getxPathInterface().getSPAN_DATA_TESTID_SEND(),
-                "//button[@title='Send Message']",
-                "//button[@aria-label='Send message']",
-                "//button[contains(@class, 'send')]",
-                "//div[@class='input-field-wrapper']//button"
-            };
-            
-            for (String xpath : sendButtonXPaths) {
-                try {
-                    logger.info("TEST: Trying send button XPath: {}", xpath);
-                    WebElement sendButton = driver.findElement(By.xpath(xpath));
-                    if (sendButton.isDisplayed() && sendButton.isEnabled()) {
-                        sendButton.click();
-                        Thread.sleep(2000);
-                        sendSuccess = true;
-                        logger.info("TEST: Successfully clicked send button using XPath: {}", xpath);
-                        break;
-                    }
-                } catch (Exception e) {
-                    logger.debug("TEST: Send button not found with XPath: {}", xpath);
-                }
-            }
+            boolean sendSuccess = clickSendButton(driver);
             
             if (sendSuccess) {
-                logger.info("TEST: Successfully sent hardcoded message to {}", contactName);
+                logger.info("Successfully sent startup notification to {}", contactName);
             } else {
-                logger.error("TEST: Failed to send hardcoded message");
+                logger.warn("Failed to send startup notification to {}", contactName);
             }
             
         } catch (Exception e) {
-            logger.error("TEST: Error sending hardcoded message: {}", e.getMessage(), e);
+            logger.error("Error sending startup notification: {}", e.getMessage(), e);
         }
     }
 
@@ -239,63 +461,18 @@ public class TG_SearchAndExtractLookingFor extends WATGParent {
      * @param extractedMessages Set of extracted messages
      */
     private void sendExtractedMessagesToPhoneNumber(WebDriver driver, Set<String> extractedMessages) {
-        String contactName = "@akashvijaykumarfs";
+        String contactName = DEFAULT_CONTACT_NAME;
         logger.info("Sending {} extracted messages to contact: {}", extractedMessages.size(), contactName);
         
         Set<String> successfullySentMessages = new HashSet<>();
         
         try {
-            // Clear search input and type contact name
             WebElement searchInput = clearAndSearchInput(driver, contactName);
             
-            // Select the contact - try multiple methods
-            logger.info("Selecting contact: {}", contactName);
-            boolean contactSelected = false;
-            
-            // Method 1: ARROW_DOWN twice then ENTER
-            try {
-                searchInput.sendKeys(org.openqa.selenium.Keys.ARROW_DOWN, Keys.ENTER);
-                Thread.sleep(1000);
-                
-                // Verify chat opened by checking for message input
-                try {
-                    driver.findElement(By.xpath(getxPathInterface().getDIV_TITLE_TYPE_A_MESSAGE()));
-                    contactSelected = true;
-                    logger.info("Contact selected successfully using ARROW_DOWN method");
-                } catch (Exception e) {
-                    logger.warn("Chat did not open with ARROW_DOWN method");
-                }
-            } catch (Exception e) {
-                logger.warn("ARROW_DOWN method failed: {}", e.getMessage());
-            }
-            
-            // Method 2: Click on search result directly
-            if (!contactSelected) {
-                try {
-                    String contactNameOnly="Akash";
-                    logger.info("Trying to click on search result directly");
-                    WebElement searchResult = driver.findElement(By.xpath(String.format(getxPathInterface().getXPATH_SEARCH_RESULT_BY_CONTACT_NAME(), contactNameOnly)));
-                    searchResult.click();
-                    Thread.sleep(2000);
-                    
-                    // Verify chat opened
-                    try {
-                        driver.findElement(By.xpath(getxPathInterface().getDIV_TITLE_TYPE_A_MESSAGE()));
-                        contactSelected = true;
-                        logger.info("Contact selected successfully using direct click");
-                    } catch (Exception e) {
-                        logger.warn("Chat did not open with direct click");
-                    }
-                } catch (Exception e) {
-                    logger.warn("Direct click method failed: {}", e.getMessage());
-                }
-            }
-            
-            if (!contactSelected) {
+            if (!selectContact(driver, searchInput, contactName)) {
                 throw new Exception("Could not select contact: " + contactName);
             }
             
-            // Try to find message input with multiple attempts
             WebElement messageInput = null;
             int maxAttempts = 3;
             for (int attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -307,10 +484,9 @@ public class TG_SearchAndExtractLookingFor extends WATGParent {
                 } catch (Exception e) {
                     logger.warn("Message input not found on attempt {}: {}", attempt, e.getMessage());
                     if (attempt < maxAttempts) {
-                        // Try to navigate to next contact
                         logger.info("Trying to navigate to next contact");
                         searchInput.sendKeys(org.openqa.selenium.Keys.ARROW_DOWN, org.openqa.selenium.Keys.ENTER);
-                        Thread.sleep(2000);
+                        Thread.sleep(CONTACT_SELECT_WAIT_MS);
                     }
                 }
             }
@@ -319,42 +495,16 @@ public class TG_SearchAndExtractLookingFor extends WATGParent {
                 throw new Exception("Could not find message input after " + maxAttempts + " attempts");
             }
             
-            // Send each message individually
             int messageCount = 1;
             for (String msg : extractedMessages) {
                 try {
                     logger.info("Sending message {}/{}: {}", messageCount, extractedMessages.size(), msg);
                     
-                    // Type the message
                     messageInput.clear();
                     messageInput.sendKeys(msg);
                     Thread.sleep(1000);
                     
-                    // Click send button with multiple XPath attempts
-                    boolean sendSuccess = false;
-                    String[] sendButtonXPaths = {
-                        getxPathInterface().getSPAN_DATA_TESTID_SEND(),
-                        "//button[@title='Send Message']",
-                        "//button[@aria-label='Send message']",
-                        "//button[contains(@class, 'send')]",
-                        "//div[@class='input-field-wrapper']//button"
-                    };
-                    
-                    for (String xpath : sendButtonXPaths) {
-                        try {
-                            logger.info("Trying send button XPath: {}", xpath);
-                            WebElement sendButton = driver.findElement(By.xpath(xpath));
-                            if (sendButton.isDisplayed() && sendButton.isEnabled()) {
-                                sendButton.click();
-                                Thread.sleep(2000);
-                                sendSuccess = true;
-                                logger.info("Successfully clicked send button using XPath: {}", xpath);
-                                break;
-                            }
-                        } catch (Exception e) {
-                            logger.debug("Send button not found with XPath: {}", xpath);
-                        }
-                    }
+                    boolean sendSuccess = clickSendButton(driver);
                     
                     if (sendSuccess) {
                         successfullySentMessages.add(msg);
@@ -364,7 +514,7 @@ public class TG_SearchAndExtractLookingFor extends WATGParent {
                     }
                     
                     messageCount++;
-                    Thread.sleep(1000); // Wait between messages
+                    Thread.sleep(1000);
                 } catch (Exception e) {
                     logger.error("Error sending message {}: {}", messageCount, e.getMessage());
                 }
@@ -376,7 +526,6 @@ public class TG_SearchAndExtractLookingFor extends WATGParent {
             logger.error("Error sending message to contact {}: {}", contactName, e.getMessage(), e);
         }
         
-        // Always export to file regardless of send success/failure
         if (!successfullySentMessages.isEmpty()) {
             logger.info("Exporting {} successfully sent messages to file", successfullySentMessages.size());
             exportExtractedMessagesToFile(successfullySentMessages);
@@ -396,80 +545,17 @@ public class TG_SearchAndExtractLookingFor extends WATGParent {
         logger.info("Sending single message to contact: {}", contactName);
         
         try {
-            // Clear search input and type contact name
             WebElement searchInput = clearAndSearchInput(driver, contactName);
             
-            // Select the contact - try multiple methods
-            logger.info("Selecting contact: {}", contactName);
-            boolean contactSelected = false;
-            
-            // Method 1: ARROW_DOWN then ENTER
-            try {
-                searchInput.sendKeys(org.openqa.selenium.Keys.ARROW_DOWN, Keys.ENTER);
-                Thread.sleep(1000);
-                
-                // Verify chat opened by checking for message input
-                try {
-                    driver.findElement(By.xpath(getxPathInterface().getDIV_TITLE_TYPE_A_MESSAGE()));
-                    contactSelected = true;
-                    logger.info("Contact selected successfully using ARROW_DOWN method");
-                } catch (Exception e) {
-                    logger.warn("Chat did not open with ARROW_DOWN method");
-                }
-            } catch (Exception e) {
-                logger.warn("ARROW_DOWN method failed: {}", e.getMessage());
-            }
-            
-            // Method 2: Click on search result directly
-            if (!contactSelected) {
-                try {
-                    String contactNameOnly="Akash";
-                    logger.info("Trying to click on search result directly");
-                    WebElement searchResult = driver.findElement(By.xpath(String.format(getxPathInterface().getXPATH_SEARCH_RESULT_BY_CONTACT_NAME(), contactNameOnly)));
-                    searchResult.click();
-                    Thread.sleep(2000);
-                    
-                    // Verify chat opened
-                    try {
-                        driver.findElement(By.xpath(getxPathInterface().getDIV_TITLE_TYPE_A_MESSAGE()));
-                        contactSelected = true;
-                        logger.info("Contact selected successfully using direct click");
-                    } catch (Exception e) {
-                        logger.warn("Chat did not open with direct click");
-                    }
-                } catch (Exception e) {
-                    logger.warn("Direct click method failed: {}", e.getMessage());
-                }
-            }
-            
-            if (!contactSelected) {
+            if (!selectContact(driver, searchInput, contactName)) {
                 throw new Exception("Could not select contact: " + contactName);
             }
             
-            // Find message input
             WebElement messageInput = driver.findElement(By.xpath(getxPathInterface().getDIV_TITLE_TYPE_A_MESSAGE()));
             messageInput.sendKeys(message);
             Thread.sleep(500);
             
-            // Click send button
-            boolean sendSuccess = false;
-            String[] sendButtonXPaths = {
-                getxPathInterface().getSPAN_DATA_TESTID_SEND(),
-                "//button[@data-icon='send']",
-                "//span[@data-icon='send']"
-            };
-            
-            for (String xpath : sendButtonXPaths) {
-                try {
-                    WebElement sendButton = driver.findElement(By.xpath(xpath));
-                    sendButton.click();
-                    sendSuccess = true;
-                    logger.info("Successfully clicked send button using XPath: {}", xpath);
-                    break;
-                } catch (Exception e) {
-                    logger.debug("Send button not found with XPath: {}", xpath);
-                }
-            }
+            boolean sendSuccess = clickSendButton(driver);
             
             if (sendSuccess) {
                 logger.info("Successfully sent single message to {}", contactName);
@@ -619,24 +705,30 @@ public class TG_SearchAndExtractLookingFor extends WATGParent {
     }
 
     /**
-     * Exports extracted messages to file as fallback when sending fails.
-     * @param extractedMessages Set of extracted messages
+     * Exports extracted messages to file by merging with existing messages.
+     * @param extractedMessages Set of extracted messages to export
      */
     private void exportExtractedMessagesToFile(Set<String> extractedMessages) {
         try {
-            String outputFileName = "dbfiles/telegram_extracted_messages.txt";
-            java.nio.file.Path outputPath = java.nio.file.Paths.get(outputFileName);
+            java.nio.file.Path outputPath = java.nio.file.Paths.get(EXTRACTED_MESSAGES_FILE);
             
-            // Append to file if it exists, otherwise create new
-            String contentToWrite = String.join("\n", extractedMessages) + "\n";
+            // Load existing messages if file exists
+            Set<String> allMessages = new LinkedHashSet<>();
             if (java.nio.file.Files.exists(outputPath)) {
-                java.nio.file.Files.write(outputPath, contentToWrite.getBytes(java.nio.charset.StandardCharsets.UTF_8), 
-                    java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.APPEND);
-            } else {
-                java.nio.file.Files.write(outputPath, contentToWrite.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                Set<String> existingMessages = java.nio.file.Files.lines(outputPath)
+                    .filter(line -> line != null && !line.trim().isEmpty())
+                    .collect(Collectors.toSet());
+                allMessages.addAll(existingMessages);
+                logger.info("Loaded {} existing messages from file", existingMessages.size());
             }
             
-            logger.info("Successfully exported {} extracted messages to: {}", extractedMessages.size(), outputFileName);
+            // Add new messages (LinkedHashSet maintains order and removes duplicates)
+            allMessages.addAll(extractedMessages);
+            
+            // Write all messages to file
+            java.nio.file.Files.write(outputPath, String.join("\n", allMessages).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            
+            logger.info("Successfully exported {} total messages ({} new) to: {}", allMessages.size(), extractedMessages.size(), EXTRACTED_MESSAGES_FILE);
         } catch (Exception e) {
             logger.error("Error exporting extracted messages to file: {}", e.getMessage(), e);
         }
@@ -648,17 +740,16 @@ public class TG_SearchAndExtractLookingFor extends WATGParent {
      */
     private Set<String> loadExistingMessagesFromFile() {
         Set<String> existingMessages = new HashSet<>();
-        String outputFileName = "dbfiles/telegram_extracted_messages.txt";
         
         try {
-            java.nio.file.Path filePath = java.nio.file.Paths.get(outputFileName);
+            java.nio.file.Path filePath = java.nio.file.Paths.get(EXTRACTED_MESSAGES_FILE);
             if (java.nio.file.Files.exists(filePath)) {
                 existingMessages = java.nio.file.Files.lines(filePath)
                     .filter(line -> line != null && !line.trim().isEmpty())
                     .collect(Collectors.toSet());
-                logger.info("Loaded {} existing messages from file: {}", existingMessages.size(), outputFileName);
+                logger.info("Loaded {} existing messages from file: {}", existingMessages.size(), EXTRACTED_MESSAGES_FILE);
             } else {
-                logger.info("No existing file found at: {}", outputFileName);
+                logger.info("No existing file found at: {}", EXTRACTED_MESSAGES_FILE);
             }
         } catch (Exception e) {
             logger.warn("Error loading existing messages from file: {}", e.getMessage());
@@ -690,10 +781,8 @@ public class TG_SearchAndExtractLookingFor extends WATGParent {
             logger.info("Current page title: {}", driver.getTitle());
             logger.info("Current URL: {}", driver.getCurrentUrl());
             
-            // TEMPORARY TEST: Send hardcoded message to verify sending works
-            logger.info("TEMPORARY TEST: Calling testSendHardcodedMessage");
-            testSendHardcodedMessage(driver);
-            logger.info("TEMPORARY TEST: testSendHardcodedMessage completed");
+            // Send startup notification to indicate service is beginning
+            sendStartupNotification(driver);
             
             // Wait for Telegram to load (check for login or main interface)
             if (!febxs(getxPathInterface().getSOCIAL_MEDIA_SCANNER_IDENTIFIER_AFTER_URL()).isEmpty()) {
@@ -711,7 +800,7 @@ public class TG_SearchAndExtractLookingFor extends WATGParent {
             Thread.sleep(1000);
             
             // Type search query with exact phrase
-            searchInput.sendKeys("\"I am looking for\"");
+            searchInput.sendKeys(SEARCH_PHRASE);
             Thread.sleep(2000);
             
             // Test scroll methods to identify which one works
@@ -721,186 +810,18 @@ public class TG_SearchAndExtractLookingFor extends WATGParent {
             Set<String> extractedMessages = extractedMessagesThreadLocal.get();
             Set<String> previousResults = new HashSet<>();
             int noNewResultsCount = 0;
-            int maxNoNewResults = 10; // Stop after 3 consecutive scrolls with no new results
+            int maxNoNewResults = MAX_NO_NEW_RESULTS;
             int scrollCount = 0;
-            int maxScrolls = 50; // Safety limit to prevent infinite scrolling
+            int maxScrolls = MAX_SCROLLS;
             
             while (noNewResultsCount < maxNoNewResults && scrollCount < maxScrolls) {
                 scrollCount++;
                 
-                // Scroll down to load more results first
-                boolean scrollSuccess = false;
+                boolean scrollSuccess = scrollWithFallback(driver, searchInput);
                 
-                // Method 1: Try JavaScript scroll on the specific LeftSearch--content custom-scroll element
-                try {
-                    WebElement scrollablePanel = findScrollablePanel(driver);
-                    if (scrollablePanel == null) throw new Exception("Scrollable panel not found");
-                    // Aggressive scroll attempts
-                    for (int i = 0; i < 5; i++) {
-                        ((org.openqa.selenium.JavascriptExecutor) driver).executeScript("arguments[0].scrollTop = arguments[0].scrollHeight;", scrollablePanel);
-                        Thread.sleep(50);
-                        ((org.openqa.selenium.JavascriptExecutor) driver).executeScript("arguments[0].scrollBy(0, 3000);", scrollablePanel);
-                        Thread.sleep(50);
-                    }
-                    // Try wheel event
-                    ((org.openqa.selenium.JavascriptExecutor) driver).executeScript("var event = new WheelEvent('wheel', {deltaY: 1000, bubbles: true}); arguments[0].dispatchEvent(event);", scrollablePanel);
-                    Thread.sleep(100);
-                    scrollSuccess = true;
-                    logger.debug("Scrolled using aggressive JavaScript on LeftSearch--content custom-scroll");
-                } catch (Exception e) {
-                    logger.debug("Error scrolling LeftSearch--content with JavaScript: {}", e.getMessage());
-                }
-                
-                // Method 1b: Try scrolling the parent of LeftSearch--content
                 if (!scrollSuccess) {
-                    try {
-                        WebElement scrollablePanel = findScrollablePanel(driver);
-                        if (scrollablePanel == null) throw new Exception("Scrollable panel not found");
-                        WebElement parentPanel = scrollablePanel.findElement(By.xpath(".."));
-                        ((org.openqa.selenium.JavascriptExecutor) driver).executeScript("arguments[0].scrollTop = arguments[0].scrollHeight;", parentPanel);
-                        Thread.sleep(200);
-                        scrollSuccess = true;
-                        logger.debug("Scrolled using JavaScript on parent of LeftSearch--content");
-                    } catch (Exception e) {
-                        logger.debug("Error scrolling parent of LeftSearch--content: {}", e.getMessage());
-                    }
-                }
-                
-                // Method 1c: Try Actions class with wheel on the specific element
-                if (!scrollSuccess) {
-                    try {
-                        WebElement scrollablePanel = findScrollablePanel(driver);
-                        if (scrollablePanel == null) throw new Exception("Scrollable panel not found");
-                        org.openqa.selenium.interactions.Actions actions = new org.openqa.selenium.interactions.Actions(driver);
-                        actions.moveToElement(scrollablePanel).sendKeys(org.openqa.selenium.Keys.PAGE_DOWN).perform();
-                        Thread.sleep(200);
-                        scrollSuccess = true;
-                        logger.debug("Scrolled using Actions PAGE_DOWN on LeftSearch--content");
-                    } catch (Exception e) {
-                        logger.debug("Error scrolling LeftSearch--content with Actions: {}", e.getMessage());
-                    }
-                }
-                
-                // Method 1d: Try scrolling the window itself
-                if (!scrollSuccess) {
-                    try {
-                        ((org.openqa.selenium.JavascriptExecutor) driver).executeScript("window.scrollBy(0, 500);");
-                        Thread.sleep(200);
-                        scrollSuccess = true;
-                        logger.debug("Scrolled using window.scrollBy");
-                    } catch (Exception e) {
-                        logger.debug("Error scrolling window: {}", e.getMessage());
-                    }
-                }
-                
-                // Method 1e: Try scrolling document.body
-                if (!scrollSuccess) {
-                    try {
-                        ((org.openqa.selenium.JavascriptExecutor) driver).executeScript("document.body.scrollTop = document.body.scrollHeight;");
-                        Thread.sleep(200);
-                        scrollSuccess = true;
-                        logger.debug("Scrolled using document.body.scrollTop");
-                    } catch (Exception e) {
-                        logger.debug("Error scrolling document.body: {}", e.getMessage());
-                    }
-                }
-                
-                // Method 1f: Try mouse wheel simulation on the element
-                if (!scrollSuccess) {
-                    try {
-                        WebElement scrollablePanel = findScrollablePanel(driver);
-                        if (scrollablePanel == null) throw new Exception("Scrollable panel not found");
-                        org.openqa.selenium.interactions.Actions actions = new org.openqa.selenium.interactions.Actions(driver);
-                        actions.moveToElement(scrollablePanel).click().perform();
-                        Thread.sleep(100);
-                        for (int i = 0; i < 3; i++) {
-                            actions.sendKeys(org.openqa.selenium.Keys.PAGE_DOWN).perform();
-                            Thread.sleep(100);
-                        }
-                        scrollSuccess = true;
-                        logger.debug("Scrolled using mouse wheel simulation with PAGE_DOWN");
-                    } catch (Exception e) {
-                        logger.debug("Error scrolling with mouse wheel simulation: {}", e.getMessage());
-                    }
-                }
-                
-                // Method 2: Try JavaScript scroll on the custom-scroll container
-                if (!scrollSuccess) {
-                    try {
-                        WebElement scrollablePanel = driver.findElement(By.xpath(getxPathInterface().getLEFT_PANEL_CHAT_LIST_WITH_CUSTOM_SCROLL_TO_SCROLL_DOWN()));
-                        ((org.openqa.selenium.JavascriptExecutor) driver).executeScript("arguments[0].scrollTop = arguments[0].scrollHeight;", scrollablePanel);
-                        Thread.sleep(200);
-                        scrollSuccess = true;
-                        logger.debug("Scrolled using JavaScript on custom-scroll container");
-                    } catch (Exception e) {
-                        logger.debug("Error scrolling panel with JavaScript: {}", e.getMessage());
-                    }
-                }
-                
-                // Method 2: Try JavaScript scroll on the inner scrollable element
-                if (!scrollSuccess) {
-                    try {
-                        WebElement scrollablePanel = driver.findElement(By.xpath("//*[contains(@class, 'custom-scroll')]"));
-                        ((org.openqa.selenium.JavascriptExecutor) driver).executeScript("arguments[0].scrollTop = arguments[0].scrollHeight;", scrollablePanel);
-                        Thread.sleep(200);
-                        scrollSuccess = true;
-                        logger.debug("Scrolled using JavaScript on inner custom-scroll element");
-                    } catch (Exception e) {
-                        logger.debug("Error scrolling inner panel with JavaScript: {}", e.getMessage());
-                    }
-                }
-                
-                // Method 3: Try scrolling the chat-list directly
-                if (!scrollSuccess) {
-                    try {
-                        WebElement scrollablePanel = driver.findElement(By.xpath("//*[contains(@class, 'chat-list')]"));
-                        ((org.openqa.selenium.JavascriptExecutor) driver).executeScript("arguments[0].scrollTop = arguments[0].scrollHeight;", scrollablePanel);
-                        Thread.sleep(200);
-                        scrollSuccess = true;
-                        logger.debug("Scrolled using JavaScript on chat-list element");
-                    } catch (Exception e) {
-                        logger.debug("Error scrolling chat-list with JavaScript: {}", e.getMessage());
-                    }
-                }
-                
-                // Method 4: Try PAGE_DOWN on the scrollable panel
-                if (!scrollSuccess) {
-                    try {
-                        WebElement scrollablePanel = driver.findElement(By.xpath(getxPathInterface().getLEFT_PANEL_CHAT_LIST_WITH_CUSTOM_SCROLL_TO_SCROLL_DOWN()));
-                        scrollablePanel.sendKeys(org.openqa.selenium.Keys.PAGE_DOWN);
-                        Thread.sleep(200);
-                        scrollSuccess = true;
-                        logger.debug("Scrolled using PAGE_DOWN on custom-scroll container");
-                    } catch (Exception e) {
-                        logger.debug("Error scrolling panel with PAGE_DOWN: {}", e.getMessage());
-                    }
-                }
-                
-                // Method 5: Try scrolling using Actions class
-                if (!scrollSuccess) {
-                    try {
-                        org.openqa.selenium.interactions.Actions actions = new org.openqa.selenium.interactions.Actions(driver);
-                        WebElement scrollablePanel = driver.findElement(By.xpath(getxPathInterface().getLEFT_PANEL_CHAT_LIST_WITH_CUSTOM_SCROLL_TO_SCROLL_DOWN()));
-                        actions.moveToElement(scrollablePanel).sendKeys(org.openqa.selenium.Keys.PAGE_DOWN).perform();
-                        Thread.sleep(200);
-                        scrollSuccess = true;
-                        logger.debug("Scrolled using Actions class with PAGE_DOWN");
-                    } catch (Exception e) {
-                        logger.debug("Error scrolling with Actions class: {}", e.getMessage());
-                    }
-                }
-                
-                // Method 6: Try search input scroll as last resort
-                if (!scrollSuccess) {
-                    try {
-                        searchInput.sendKeys(org.openqa.selenium.Keys.PAGE_DOWN);
-                        Thread.sleep(200);
-                        scrollSuccess = true;
-                        logger.debug("Scrolled using search input PAGE_DOWN");
-                    } catch (Exception e3) {
-                        logger.debug("Alternative scroll also failed: {}", e3.getMessage());
-                        noNewResultsCount = maxNoNewResults; // Force exit
-                    }
+                    logger.warn("All scroll methods failed, forcing exit");
+                    noNewResultsCount = maxNoNewResults;
                 }
                 
                 Thread.sleep(500);
@@ -937,28 +858,20 @@ public class TG_SearchAndExtractLookingFor extends WATGParent {
                     try {
                         String resultText = result.getText();
                         logger.info("Result text raw: '{}'", resultText);
-                        if (resultText != null) {
-                            //logger.info("Result text length: {}", resultText.length());
-                            logger.info("Result text trim empty: {}", resultText.trim().isEmpty());
-                        }
-                        
+
                         if (resultText != null && !resultText.trim().isEmpty()) {
                             logger.info("Processing search result: {}", resultText);
-                            logger.info("Result text lowercase: {}", resultText.toLowerCase());
                             
-                            // Match exact phrase "I am looking for" (case-insensitive)
-                            if ((resultText.toLowerCase().contains("i am looking for") || resultText.toLowerCase().contains("we are looking for"))
-                                    && (resultText.toLowerCase().contains("support") || resultText.toLowerCase().contains("interview")) || resultText.toLowerCase().contains("proxy")) {
-                                // Check if message already exists in file or current extraction
+                            if (isLookingForMessage(resultText)) {
                                 if (!extractedMessages.contains(resultText) && !existingMessages.contains(resultText)) {
                                     extractedMessages.add(resultText);
                                     newResultsThisPage++;
-                                    logger.info("Extracted search result: {}", resultText);
+                                    //logger.info("Extracted search result: {}", resultText);
                                 } else {
                                     logger.debug("Skipping duplicate message: {}", resultText);
                                 }
                             } else {
-                                logger.info("Preview text does not contain 'i am looking for', skipping");
+                                logger.info("Preview text does not match 'looking for' criteria, skipping");
                             }
                         } else {
                             logger.info("Result text is null or empty, skipping");
@@ -991,7 +904,7 @@ public class TG_SearchAndExtractLookingFor extends WATGParent {
             } else {
                 logger.info("No new messages to send - all extracted messages already exist in file");
                 // Send notification message that no new posts were found
-                sendSingleMessage(driver, "@akashvijaykumarfs", "Telegram: No New Post with 'Looking for Support' Found");
+                sendSingleMessage(driver, DEFAULT_CONTACT_NAME, NO_NEW_POSTS_MESSAGE);
             }
             
             // Clear search
@@ -1079,8 +992,7 @@ public class TG_SearchAndExtractLookingFor extends WATGParent {
             }
             
             // Create output file path
-            String outputFileName = "dbfiles/telegram_extracted_messages.txt";
-            java.nio.file.Path outputPath = java.nio.file.Paths.get(outputFileName);
+            java.nio.file.Path outputPath = java.nio.file.Paths.get(EXTRACTED_MESSAGES_FILE);
             
             // Load existing messages from file if it exists
             Set<String> allMessages = new LinkedHashSet<>();
@@ -1098,7 +1010,7 @@ public class TG_SearchAndExtractLookingFor extends WATGParent {
             // Write all messages (existing + new) to file
             java.nio.file.Files.write(outputPath, String.join("\n", allMessages).getBytes(java.nio.charset.StandardCharsets.UTF_8));
             
-            logger.info("Successfully exported {} total messages ({} new) to: {}", allMessages.size(), extractedMessages.size(), outputFileName);
+            logger.info("Successfully exported {} total messages ({} new) to: {}", allMessages.size(), extractedMessages.size(), EXTRACTED_MESSAGES_FILE);
             
             // Also add to the mapping if provided
             if (setOfDataMapping != null) {
