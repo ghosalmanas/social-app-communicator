@@ -29,6 +29,8 @@ import java.util.concurrent.CompletableFuture;
 public class TelegramSearchAndExtractLookingForStarter extends SocialMediaServiceStarter {
     private static final Logger logger = LogManager.getLogger(TelegramSearchAndExtractLookingForStarter.class);
 
+    private final com.wtf.app.service.impls.TG_SearchAndExtractLookingFor tgSearchAndExtractLookingFor;
+
     /**
      * Constructs a new TelegramSearchAndExtractLookingForStarter with required dependencies.
      *
@@ -38,19 +40,18 @@ public class TelegramSearchAndExtractLookingForStarter extends SocialMediaServic
      * @param whatsappDTO The WhatsApp DTO
      * @param telegramDTO The Telegram DTO
      * @param facebookDTO The Facebook DTO
+     * @param tgSearchAndExtractLookingFor The Telegram search and extract service
      */
     @Autowired
     public TelegramSearchAndExtractLookingForStarter(
-            
             InitialSetup initialSetup,
             ParallelWebDriverManager parallelWebDriverManager,
             SocialMediaParentRunner socialMediaParentRunner,
             @Qualifier("whatsappDTO") SocialModel whatsappDTO,
             @Qualifier("telegramDTO") SocialModel telegramDTO,
-            @Qualifier("facebookDTO") SocialModel facebookDTO) {
-        
+            @Qualifier("facebookDTO") SocialModel facebookDTO,
+            com.wtf.app.service.impls.TG_SearchAndExtractLookingFor tgSearchAndExtractLookingFor) {
         super(
-            
             initialSetup,
             parallelWebDriverManager,
             socialMediaParentRunner,
@@ -58,7 +59,7 @@ public class TelegramSearchAndExtractLookingForStarter extends SocialMediaServic
             telegramDTO,
             facebookDTO
         );
-        
+        this.tgSearchAndExtractLookingFor = tgSearchAndExtractLookingFor;
         logger.debug("TelegramSearchAndExtractLookingForStarter initialized with all required dependencies");
     }
 
@@ -76,13 +77,10 @@ public class TelegramSearchAndExtractLookingForStarter extends SocialMediaServic
         logger.info("Searching and extracting 'I am looking for' messages from Telegram");
 
         try {
-            // Create instance of TG_SearchAndExtractLookingFor
-            com.wtf.app.service.impls.TG_SearchAndExtractLookingFor instance = new com.wtf.app.service.impls.TG_SearchAndExtractLookingFor(initialSetup, parallelWebDriverManager);
-            
             // Execute the search and extract logic using the start method which handles initialization
             AutomationContext tempContext = new AutomationContext(TaskType.TELEGRAM_SEARCH_LOOKING_FOR);
             tempContext.setSocialModel(telegramDTO);
-            instance.start(tempContext, TaskType.TELEGRAM_SEARCH_LOOKING_FOR).get();
+            tgSearchAndExtractLookingFor.start(tempContext, TaskType.TELEGRAM_SEARCH_LOOKING_FOR).get();
             
             logger.info("Successfully searched and extracted 'I am looking for' messages from Telegram");
         } catch (Exception e) {

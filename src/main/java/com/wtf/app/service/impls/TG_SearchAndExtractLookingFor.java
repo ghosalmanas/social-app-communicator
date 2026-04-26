@@ -16,6 +16,8 @@ import org.openqa.selenium.Keys;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
 
 import java.awt.*;
 import java.io.IOException;
@@ -28,6 +30,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * Service for searching and extracting "I am looking for" messages from Telegram.
  * This service extends WATGParent to leverage the existing traversal infrastructure.
  */
+@Component
 public class TG_SearchAndExtractLookingFor extends WATGParent {
 
     private static final Logger logger = LogManager.getLogger(TG_SearchAndExtractLookingFor.class);
@@ -45,8 +48,14 @@ public class TG_SearchAndExtractLookingFor extends WATGParent {
     private static final int CONTACT_SELECT_WAIT_MS = 2000;
     private static final int MESSAGE_SEND_WAIT_MS = 2000;
     private static final int SCROLL_WAIT_MS = 200;
-    private static final int MAX_NO_NEW_RESULTS = 10;
-    private static final int MAX_SCROLLS = 50;
+    private static final int NAVIGATION_WAIT_MS = 2000;
+
+    // Scroll configuration from application.properties
+    @Value("${telegram.search.looking.for.max.scrolls:50}")
+    private int maxScrolls;
+
+    @Value("${telegram.search.looking.for.max.no.new.results:10}")
+    private int maxNoNewResults;
 
     private final ThreadLocal<Set<String>> extractedMessagesThreadLocal = ThreadLocal.withInitial(LinkedHashSet::new);
 
@@ -250,7 +259,7 @@ public class TG_SearchAndExtractLookingFor extends WATGParent {
             for (int i = 0; i < 5; i++) {
                 ((org.openqa.selenium.JavascriptExecutor) driver).executeScript("arguments[0].scrollTop = arguments[0].scrollHeight;", scrollablePanel);
                 Thread.sleep(50);
-                ((org.openqa.selenium.JavascriptExecutor) driver).executeScript("arguments[0].scrollBy(0, 3000);", scrollablePanel);
+                ((org.openqa.selenium.JavascriptExecutor) driver).executeScript("arguments[0].scrollBy(0, 2000);", scrollablePanel);
                 Thread.sleep(50);
             }
             ((org.openqa.selenium.JavascriptExecutor) driver).executeScript("var event = new WheelEvent('wheel', {deltaY: 1000, bubbles: true}); arguments[0].dispatchEvent(event);", scrollablePanel);
@@ -430,6 +439,7 @@ public class TG_SearchAndExtractLookingFor extends WATGParent {
         logger.info("Sending startup notification to contact: {}", contactName);
         
         try {
+            Thread.sleep(2000); // Wait for scanner/page to load
             WebElement searchInput = clearAndSearchInput(driver, contactName);
             
             if (!selectContact(driver, searchInput, contactName)) {
@@ -773,21 +783,44 @@ public class TG_SearchAndExtractLookingFor extends WATGParent {
             // Initialize driver
             WebDriver driver = getDriver();
             
-            // Navigate to the base URL
-            driver.get(getBaseUrl());
-            Thread.sleep(2000);
+            // Navigate to the base URL with retry logic
+            int maxNavRetries = 3;
+            int navRetryCount = 0;
+            boolean navigationSuccess = false;
             
-            logger.info("Navigated to Telegram base URL");
+            while (navRetryCount < maxNavRetries && !navigationSuccess) {
+                try {
+                    logger.info("Navigation attempt {} to {}", navRetryCount + 1, getBaseUrl());
+                    driver.get(getBaseUrl());
+                    Thread.sleep(NAVIGATION_WAIT_MS);
+                    navigationSuccess = true;
+                    logger.info("Successfully navigated to Telegram base URL");
+                } catch (org.openqa.selenium.WebDriverException e) {
+                    navRetryCount++;
+                    logger.warn("Navigation attempt {} failed: {}", navRetryCount, e.getMessage());
+                    if (navRetryCount < maxNavRetries) {
+                        logger.info("Retrying navigation in 2 seconds...");
+                        Thread.sleep(2000);
+                    } else {
+                        logger.error("Failed to navigate after {} attempts", maxNavRetries);
+                        throw e;
+                    }
+                }
+            }
+            
             logger.info("Current page title: {}", driver.getTitle());
             logger.info("Current URL: {}", driver.getCurrentUrl());
             
+            // Wait for Telegram to load (check for scanner or main interface)
+            if (!febxs(getxPathInterface().getSOCIAL_MEDIA_SCANNER_IDENTIFIER_AFTER_URL()).isEmpty()) {
+                logger.info("Telegram scanner detected, waiting for QR code scan...");
+                Thread.sleep(30000); // Wait for user to scan QR code
+            }
+            
+            Thread.sleep(2000); // Wait for page to fully load after scanner
+            
             // Send startup notification to indicate service is beginning
             sendStartupNotification(driver);
-            
-            // Wait for Telegram to load (check for login or main interface)
-            if (!febxs(getxPathInterface().getSOCIAL_MEDIA_SCANNER_IDENTIFIER_AFTER_URL()).isEmpty()) {
-                logger.info("Telegram loaded successfully");
-            }
             
             // Click on search input using XPath from Telegram_Xpaths
             String searchXPath = getxPathInterface().getXPATH_SEARCH();
@@ -802,17 +835,12 @@ public class TG_SearchAndExtractLookingFor extends WATGParent {
             // Type search query with exact phrase
             searchInput.sendKeys(SEARCH_PHRASE);
             Thread.sleep(2000);
-            
-            // Test scroll methods to identify which one works
-            testScrollMethods(driver);
-            
+
             // Extract messages with pagination - scroll and extract until no more results
             Set<String> extractedMessages = extractedMessagesThreadLocal.get();
             Set<String> previousResults = new HashSet<>();
             int noNewResultsCount = 0;
-            int maxNoNewResults = MAX_NO_NEW_RESULTS;
             int scrollCount = 0;
-            int maxScrolls = MAX_SCROLLS;
             
             while (noNewResultsCount < maxNoNewResults && scrollCount < maxScrolls) {
                 scrollCount++;
@@ -826,7 +854,7 @@ public class TG_SearchAndExtractLookingFor extends WATGParent {
                 
                 Thread.sleep(500);
                 // Extract messages from current page
-                java.util.List<WebElement> searchResults = driver.findElements(By.xpath(getxPathInterface().getXPATH_SEARCH_EXTRACT_MESSAGE_ELEMENTS()));
+                java.util.List<WebElement> searchResults = driver.findElements(By.xpath(getxPathInterface().getXPATH_SEARCH_EXTRACT_MESSAGE_ELEMENTS_LOOKING_FOR()));
                 logger.info("Scroll {}: Found {} search result entries to process", scrollCount, searchResults.size());
                 
                 // Check if we've reached the end (no more results to scroll)
@@ -857,7 +885,7 @@ public class TG_SearchAndExtractLookingFor extends WATGParent {
                     WebElement result = searchResults.get(i);
                     try {
                         String resultText = result.getText();
-                        logger.info("Result text raw: '{}'", resultText);
+                        logger.info("\nResult text raw: '{}'", resultText);
 
                         if (resultText != null && !resultText.trim().isEmpty()) {
                             logger.info("Processing search result: {}", resultText);

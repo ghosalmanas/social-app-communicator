@@ -459,12 +459,8 @@ public class Telegram_Xpaths implements XPathInterfaceWATG {
     }
 
     @Override
-    public String getXPATH_SEARCH_EXTRACT_MESSAGE_ELEMENTS() {
+    public String getXPATH_SEARCH_EXTRACT_MESSAGE_ELEMENTS_LOOKING_FOR() {
         return XPATH_SEARCH_EXTRACT_MESSAGE_ELEMENTS;
     }
 
-    @Override
-    public String getXPATH_SEARCH_EXTRACT_LOOKING_FOR() {
-        return XPATH_SEARCH_EXTRACT_LOOKING_FOR;
-    }
 }

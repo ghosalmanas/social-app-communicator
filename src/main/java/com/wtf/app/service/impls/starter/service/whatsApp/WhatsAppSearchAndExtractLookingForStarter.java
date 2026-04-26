@@ -31,6 +31,8 @@ import java.util.concurrent.CompletableFuture;
 public class WhatsAppSearchAndExtractLookingForStarter extends SocialMediaServiceStarter {
     private static final Logger logger = LogManager.getLogger(WhatsAppSearchAndExtractLookingForStarter.class);
 
+    private final WA_SearchAndExtractLookingFor waSearchAndExtractLookingFor;
+
     /**
      * Constructs a new WhatsAppSearchAndExtractLookingForStarter with required dependencies.
      *
@@ -40,6 +42,7 @@ public class WhatsAppSearchAndExtractLookingForStarter extends SocialMediaServic
      * @param whatsappDTO DTO for WhatsApp configuration
      * @param telegramDTO DTO for Telegram configuration
      * @param facebookDTO DTO for Facebook configuration
+     * @param waSearchAndExtractLookingFor The WhatsApp search and extract service
      */
     @Autowired
     public WhatsAppSearchAndExtractLookingForStarter(
@@ -48,7 +51,8 @@ public class WhatsAppSearchAndExtractLookingForStarter extends SocialMediaServic
             SocialMediaParentRunner socialMediaParentRunner,
             @Qualifier("whatsappDTO") SocialModel whatsappDTO,
             @Qualifier("telegramDTO") SocialModel telegramDTO,
-            @Qualifier("facebookDTO") SocialModel facebookDTO) {
+            @Qualifier("facebookDTO") SocialModel facebookDTO,
+            WA_SearchAndExtractLookingFor waSearchAndExtractLookingFor) {
         super(
             initialSetup,
             parallelWebDriverManager,
@@ -57,6 +61,7 @@ public class WhatsAppSearchAndExtractLookingForStarter extends SocialMediaServic
             telegramDTO,
             facebookDTO
         );
+        this.waSearchAndExtractLookingFor = waSearchAndExtractLookingFor;
         logger.debug("WhatsAppSearchAndExtractLookingForStarter initialized");
     }
 
@@ -94,13 +99,10 @@ public class WhatsAppSearchAndExtractLookingForStarter extends SocialMediaServic
         logger.info("Starting to search and extract 'I am looking for' messages from WhatsApp");
 
         try {
-            // Create instance of WA_SearchAndExtractLookingFor
-            WA_SearchAndExtractLookingFor instance = new WA_SearchAndExtractLookingFor(initialSetup, parallelWebDriverManager);
-            
             // Execute the search and extract logic using the start method which handles initialization
             AutomationContext tempContext = new AutomationContext(TaskType.WHATSAPP_SEARCH_LOOKING_FOR);
             tempContext.setSocialModel(whatsappDTO);
-            instance.start(tempContext, TaskType.WHATSAPP_SEARCH_LOOKING_FOR).get();
+            waSearchAndExtractLookingFor.start(tempContext, TaskType.WHATSAPP_SEARCH_LOOKING_FOR).get();
             
             logger.info("Successfully searched and extracted 'I am looking for' messages from WhatsApp");
         } catch (Exception e) {

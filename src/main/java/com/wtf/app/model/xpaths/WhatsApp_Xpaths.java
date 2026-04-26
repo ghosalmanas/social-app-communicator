@@ -118,15 +118,15 @@ public class WhatsApp_Xpaths implements XPathInterfaceWATG {
     private final String WA_PINNED_SPAN_TITLE_FOR_UNARCHIVE = "//span[@title='Archived']";
     private final String SPAN_CLOSE_POPUP_ARCHIVE_UNARCHIVE_X_ALT = "//span[@data-testid='x-alt' or @data-icon='x-alt']";
 
-    private final String SPAN_DATA_TESTID_SEND = "//div[@aria-label='Send']";
+    private final String SPAN_DATA_TESTID_SEND = "//button[@aria-label='Send']";
     private final String DIV_TITLE_TYPE_A_MESSAGE = "//div[@aria-placeholder='Type a message']";
     private final String FIND_MESSAGE_TEXT_NOT_ALLOWED_IN_POST_BOX = "//*[text()='Text not allowed']";
 
-    private final String LABEL_MAGNIFYING_GLASS_SEARCH_BUTTON_XPATH = "//*[@aria-label='Search input textbox']/parent::div";
+    private final String LABEL_MAGNIFYING_GLASS_SEARCH_BUTTON_XPATH = "//*[@aria-label='Search or start a new chat']/parent::div";
     //"//button[@aria-label='Search or start new chat']";
     private final String BACK_ARROW__BESIDE_MAGNIFYING_GLASS_SEARCH_BUTTON_XPATH = "//div[@aria-label='Chat list']";
 
-    private final String XPATH_SEARCH = "//*[@aria-label='Search input textbox']";
+    private final String XPATH_SEARCH = "//*[@aria-label='Search or start a new chat']";
     //"//*[@id=\"side\"]/div[1]/div/div/div[2]/div/div[1]/p";
     private final String SELECT_FIRST_RESULT_FROM_SEARCH_OF_PREVIOUS_GROUP = "//span[contains(@title,'%s')]";
     private final String CLEAR_SEARCH_OF_PREVIOUS_GROUP_AFTER_SELECTION = "//button[@aria-label='Cancel search']";
@@ -151,6 +151,11 @@ public class WhatsApp_Xpaths implements XPathInterfaceWATG {
     private final String MESSAGE_WITH_ERROR_STATUS = "//span[@data-icon='error']";
 
     private final String WHATSAPP_SCANNER_IDENTIFIER = "//title[text()='WhatsApp']";
+
+    // Search and extract specific XPaths for contact selection and message extraction :Looking for
+    private final String XPATH_SEARCH_RESULT_BY_CONTACT_NAME = "//*[contains(@class, 'chat-list')]//h3[contains(text(), '%s')]/ancestor::div[@class='info']/preceding-sibling::div[contains(@class,'ripple-container')]";
+    private final String XPATH_SEARCH_EXTRACT_MESSAGE_ELEMENTS_LOOKING_FOR = "//div[@aria-label='Search results.']/descendant::span[@data-testid='last-msg-status']";
+
 
     //ROBOT Properties
     private final int MOVE_TO_CHAT_VK_NEXT = KeyEvent.VK_CLOSE_BRACKET;
@@ -421,19 +426,14 @@ public class WhatsApp_Xpaths implements XPathInterfaceWATG {
         return FIND_MESSAGE_TEXT_NOT_ALLOWED_IN_POST_BOX;
     }
 
-    @Override
-    public String getXPATH_SEARCH_EXTRACT_LOOKING_FOR() {
-        return "";
-    }
-
 
     @Override
-    public String getXPATH_SEARCH_EXTRACT_MESSAGE_ELEMENTS() {
-        return "";
+    public String getXPATH_SEARCH_EXTRACT_MESSAGE_ELEMENTS_LOOKING_FOR() {
+        return XPATH_SEARCH_EXTRACT_MESSAGE_ELEMENTS_LOOKING_FOR;
     }
 
     @Override
     public String getXPATH_SEARCH_RESULT_BY_CONTACT_NAME() {
-        return "";
+        return XPATH_SEARCH_RESULT_BY_CONTACT_NAME;
     }
 }

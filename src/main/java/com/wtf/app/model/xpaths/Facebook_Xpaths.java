@@ -186,11 +186,5 @@ public class Facebook_Xpaths implements XPathInterfaceFB {
         return SocialType.FACEBOOK;
     }
 
-    @Override
-    public String getXPATH_SEARCH_EXTRACT_LOOKING_FOR() {
-        return "";
-    }
-
-
 
 }

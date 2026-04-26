@@ -100,5 +100,5 @@ public interface XPathInterfaceWATG extends XPathInterface {
 
 	String getXPATH_SEARCH_RESULT_BY_CONTACT_NAME();
 
-	String getXPATH_SEARCH_EXTRACT_MESSAGE_ELEMENTS();
+	String getXPATH_SEARCH_EXTRACT_MESSAGE_ELEMENTS_LOOKING_FOR();
 }
